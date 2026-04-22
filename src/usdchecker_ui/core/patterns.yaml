@@ -1,124 +1,460 @@
 # USDChecker UI — pattern dictionary (bundled default)
 #
-# Keyed by the exact rule name emitted by pxr.UsdUtils.ComplianceChecker
-# (see `UsdUtils.ComplianceChecker().GetRules()`). One entry per rule
-# currently shipped by usd-core; the user override at
-#   ~/Library/Application Support/USDCheckerUI/patterns.yaml   (macOS)
-#   %APPDATA%\USDCheckerUI\patterns.yaml                       (Windows)
-# wins rule-by-rule, so users can customize individual rules without
-# shadowing the ones they don't care about.
+# Schema
+# ------
+# Each entry targets one humanized explanation of one specific problem.
+# Required keys:
+#   - rule:        Exact rule class name emitted by
+#                  pxr.UsdUtils.ComplianceChecker().GetRules()
+#                  (e.g. "StageMetadataChecker"). One rule can have
+#                  several entries — see below.
+#   - title:       One-line headline shown in the detail panel.
+#   - explanation: Multi-line "why this matters" body.
+#   - suggestion:  Multi-line concrete fix path.
+# Optional key:
+#   - match:       Substring of the raw diagnostic message. Used to
+#                  distinguish sub-cases of the same rule. Entries are
+#                  tried top-down; the FIRST entry whose `match` is a
+#                  substring of the raw message wins. An entry without
+#                  a `match` key (or with an empty one) is the catch-all
+#                  for that rule and must come LAST among that rule's
+#                  entries.
+#
+# Ordering
+# --------
+# For each rule, specific `match` entries come first, followed by the
+# catch-all. The enricher stops at the first match.
+#
+# Source of truth for the match strings
+# -------------------------------------
+# The `match:` substrings below are lifted verbatim from the Python
+# source of pxr.UsdUtils.complianceChecker (2026-04 snapshot, usd-core
+# 26.3). If usd-core later rewords a message, the corresponding match
+# will stop firing and the catch-all (or no enrichment) will take over.
+# tests/test_patterns_store.py::test_bundled_covers_every_pxr_rule
+# fails loudly if a new rule appears in a usd-core upgrade.
+#
+# User override
+# -------------
+# A user override at
+#   ~/Library/Application Support/USDCheckerUI/patterns.yaml     (macOS)
+#   %APPDATA%\USDCheckerUI\patterns.yaml                         (Windows)
+# replaces the bundled entries for a given rule RULE-BY-RULE. Listing
+# any entry for a rule wipes that rule's bundled entries — so if you
+# override one sub-case, copy the other sub-cases too if you still want
+# them.
 
-# --------------------------------------------------------------------
-# Stage-level metadata
-# --------------------------------------------------------------------
+# ====================================================================
+# StageMetadataChecker
+# ====================================================================
+# Emits four distinct messages, three of them are fatal for any USD
+# consumer, the fourth ("upAxis is not Y") only fires in consumer-level
+# (AR Quick Look / USDZ) runs.
 
 - rule: StageMetadataChecker
-  title: "Stage missing upAxis or metersPerUnit"
+  match: "does not specify an upAxis"
+  title: "Stage does not declare `upAxis`"
   explanation: |
-    The root layer does not declare upAxis and/or metersPerUnit. Without
-    these, every consumer has to guess: Y-up vs Z-up flips models on
-    their side, and scale defaults differ between DCCs (Maya cm,
-    Houdini m, Blender m…), producing wildly wrong sizing downstream.
-    Stages meant to be referenced as assets should also declare a
-    defaultPrim; stages meant for consumer-level packaging (AR Quick
-    Look etc.) MUST have upAxis = "Y".
+    The root layer has no `upAxis` metadata. Every consumer has to guess
+    the scene orientation — Y-up vs Z-up flips models on their side —
+    and results diverge between Maya (Y), Houdini/Unreal (Z), and the
+    USDZ / AR Quick Look specs (which mandate Y). For any stage shared
+    across pipelines, `upAxis` is mandatory.
   suggestion: |
-    At the top of the root .usda, add:
+    At the top of the root .usda, declare upAxis in the layer metadata:
+        #usda 1.0
         (
             upAxis = "Y"
-            metersPerUnit = 1
-            defaultPrim = "World"   # if the stage is referenceable
         )
+    For consumer-level packaging (USDZ, AR Quick Look), `"Y"` is the
+    only valid value — see the next sub-case.
 
-# --------------------------------------------------------------------
-# Asset resolution
-# --------------------------------------------------------------------
+- rule: StageMetadataChecker
+  match: "upAxis should be"
+  title: "Stage `upAxis` is not `Y` (required for consumer packaging)"
+  explanation: |
+    The stage declares `upAxis` but not as `"Y"`. Consumer-level USDZ
+    targets (AR Quick Look, most mobile viewers) require `"Y"` — any
+    other value renders the asset rotated 90° on first preview.
+  suggestion: |
+    Change the root layer's upAxis to "Y":
+        (
+            upAxis = "Y"
+        )
+    If the asset was authored Z-up and converting would flip geometry,
+    bake a rotation at the root Xform rather than changing the coord
+    system mid-pipeline.
+
+- rule: StageMetadataChecker
+  match: "metersPerUnit"
+  title: "Stage does not declare `metersPerUnit`"
+  explanation: |
+    The root layer has no `metersPerUnit` metadata. Every DCC defaults
+    differently (Maya cm → 0.01, Houdini/Blender m → 1, legacy tools
+    mm → 0.001), so a stage without this metadatum renders at a
+    wrong scale as soon as it crosses a tool boundary.
+  suggestion: |
+    At the top of the root .usda, declare metersPerUnit:
+        (
+            metersPerUnit = 1
+        )
+    Use 1 for meters (the USDZ default), 0.01 for centimetres (Maya
+    source), 0.001 for millimetres. Match whatever the authoring tool
+    wrote the geometry in.
+
+- rule: StageMetadataChecker
+  match: "missing or invalid defaultPrim"
+  title: "Stage has no valid `defaultPrim`"
+  explanation: |
+    The stage is meant to be consumed as a referenceable asset but
+    declares no `defaultPrim` (or points at a path that does not
+    resolve to an actual prim). When another stage references this
+    file without an explicit prim path, USD needs `defaultPrim` to
+    know which prim to bring in — without it, the reference resolves
+    to nothing and the consumer sees an empty import.
+  suggestion: |
+    Pick the prim that should be the entry point (usually a top-level
+    Xform named after the asset) and declare it:
+        #usda 1.0
+        (
+            defaultPrim = "World"
+        )
+        def Xform "World" { ... }
+    Make sure the named prim actually exists at the stage root.
+
+- rule: StageMetadataChecker
+  title: "Stage metadata issue"
+  explanation: |
+    `StageMetadataChecker` flagged a metadata issue on the root layer
+    that does not match one of the recognized sub-cases (upAxis,
+    metersPerUnit, defaultPrim). See the raw message for specifics.
+  suggestion: |
+    Check the root layer's header metadata against the USD schema for
+    stage metadata.
+
+# ====================================================================
+# MissingReferenceChecker
+# ====================================================================
+# Two sub-cases: an "unresolvable external dependency" with a fixed
+# prefix, and a passthrough of any pxr composition error whose text
+# varies (sublayer resolution, reference resolution, payload errors…).
 
 - rule: MissingReferenceChecker
-  title: "Unresolvable asset reference"
+  match: "unresolvable external dependency"
+  title: "Unresolvable asset dependency"
   explanation: |
-    A prim references an asset path (texture, sublayer, referenced
-    .usd file…) that the default asset resolver cannot resolve on
-    this stage. At render time the consumer will see either a hole,
-    an error, or silently-missing content.
+    The stage references an asset (texture, sublayer, referenced
+    .usd file, …) that the default asset resolver cannot find on
+    this machine. At render time the consumer sees a hole, a default
+    material, or an outright error depending on the asset type.
   suggestion: |
-    Check the @assetPath@ in the raw message. Fix the path (relative
-    vs absolute, typo, wrong extension), ensure the file is present
-    in the package you are shipping, or set up the right asset
-    resolver context (ArResolver) before composing the stage.
+    Check the `@assetPath@` in the raw message below. Fix the path
+    (relative vs absolute, typo, wrong extension), make sure the file
+    is actually present next to / inside the package you are shipping,
+    or configure a matching asset resolver context before composing
+    the stage.
+
+- rule: MissingReferenceChecker
+  title: "Composition error opening the stage"
+  explanation: |
+    USD emitted a composition-time error while opening the stage —
+    typically a sublayer, reference, or payload that failed to
+    resolve or parse. The raw message below is the diagnostic
+    text produced by the composition engine.
+  suggestion: |
+    Read the raw message for the specific arc and path. Common root
+    causes: a sublayer file that was moved or renamed, a reference
+    to a prim path that no longer exists, or a .usd file whose
+    version is incompatible with the current usd-core wheel.
+
+# ====================================================================
+# TextureChecker
+# ====================================================================
+# Emits two distinct messages depending on whether the extension is
+# merely "not consumer-portable" or completely unknown. Only fires on
+# USDZ archives or when consumer-level checks are on.
 
 - rule: TextureChecker
-  title: "Texture in unsupported format"
+  match: "non-portable file format"
+  title: "Texture in non-portable format for consumer USDZ"
   explanation: |
-    A texture referenced by the stage uses a format a downstream
-    consumer may not be able to read. For consumer-level .usdz
-    (AR Quick Look, most mobile viewers), only .jpg/.jpeg and .png
-    are safe; EXR, TIFF, and TGA are tolerated by some pipelines but
-    not by the ARKit-compliant reader.
+    A texture uses a format `usd-core` can decode but the USDZ spec
+    forbids for consumer-level packaging (bmp, tga, hdr, tif, tx,
+    zfile). The asset works in DCCs but will fail to load in AR
+    Quick Look and most mobile viewers.
   suggestion: |
-    Convert the texture to .jpg or .png, then update the corresponding
-    inputs:file path in the shader. If your pipeline tolerates
-    broader formats, this check can be disabled via usdchecker's
-    non-ARKit mode — but leave it ON for anything user-facing.
+    Convert the texture to `.jpg` or `.png`, then update the
+    `inputs:file` asset path on the shader that references it. For
+    non-consumer pipelines that tolerate broader formats, disable
+    this check by running `usdchecker` without `--arkit`.
 
-# --------------------------------------------------------------------
-# Scene graph structure
-# --------------------------------------------------------------------
+- rule: TextureChecker
+  match: "unknown file format"
+  title: "Texture in unrecognized format"
+  explanation: |
+    A texture uses a format that is on neither the core USDZ allow-list
+    (jpg / jpeg / png / exr) nor the extended "decodable" list. The
+    consumer will treat the asset as missing.
+  suggestion: |
+    Re-export the texture to `.jpg` or `.png`. For EXR inputs that
+    you need to keep linear, `.exr` is tolerated outside consumer-
+    level checks but still rejected for USDZ.
+
+- rule: TextureChecker
+  title: "Texture format issue"
+  explanation: |
+    `TextureChecker` flagged a texture asset that does not match one of
+    the recognized sub-cases. See the raw message for specifics.
+  suggestion: |
+    Verify the texture's extension is in the allowed set for your
+    pipeline (jpg / jpeg / png for USDZ; add exr / tif for non-consumer
+    flows).
+
+# ====================================================================
+# PrimEncapsulationChecker
+# ====================================================================
+# Three distinct sub-cases: Boundable-under-Gprim (geometric nesting
+# error), Connectable-under-non-Container (shader inside a Shader, or
+# shader at root, etc.), and Connectable-under-non-connectable-but-
+# with-a-connectable-ancestor (Scope inside a Material, typically).
+
+- rule: PrimEncapsulationChecker
+  match: "has an ancestor prim that is also a Gprim"
+  title: "Boundable nested under another Gprim"
+  explanation: |
+    A geometric prim (Mesh, Sphere, Cube, PointInstancer, …) has
+    another Gprim as an ancestor. USD forbids this because visibility,
+    extents, and picking can't be computed independently for nested
+    Gprims. The typical mistake is dropping a PointInstancer under a
+    Mesh instead of alongside it under an Xform.
+  suggestion: |
+    Move the inner Gprim one level up into an Xform or Scope:
+        def Xform "Parent" {
+            def Mesh "Outer" { ... }
+            def Mesh "Inner" { ... }   # not INSIDE "Outer"
+        }
+
+- rule: PrimEncapsulationChecker
+  match: "cannot reside under a non-Container Connectable"
+  title: "Shader nested under a non-container Connectable"
+  explanation: |
+    A Connectable prim (Shader, NodeGraph, Light, …) is parented under
+    another Connectable that is not a Container — typically another
+    Shader. The UsdShade schema only allows Connectables inside
+    Container-like parents (`Material`, `NodeGraph`, `Light`,
+    `LightFilter`). Anything else breaks connection resolution.
+  suggestion: |
+    Move the inner Shader out into the enclosing Material/NodeGraph:
+        def Material "Mat" {
+            def Shader "Outer" { ... }
+            def Shader "Inner" { ... }   # sibling, not child of "Outer"
+        }
+
+- rule: PrimEncapsulationChecker
+  match: "can only have Connectable Container ancestors"
+  title: "Connectable separated from its Material by a non-Container parent"
+  explanation: |
+    A Connectable (typically a Shader) lives under a non-Connectable
+    parent (Scope, Xform, …) that is itself inside a Connectable
+    Container (Material, NodeGraph). USD requires an unbroken chain
+    of Containers between a Shader and its Material; a Scope in the
+    middle breaks the chain.
+  suggestion: |
+    Either remove the Scope (make the Shader a direct child of the
+    Material / NodeGraph), or replace the Scope with a NodeGraph if
+    you need the grouping.
 
 - rule: PrimEncapsulationChecker
   title: "Prim encapsulation violated"
   explanation: |
-    The scene graph nests prims in a way USD forbids — most commonly
-    a Boundable (Mesh, Sphere, Cube…) placed under another Gprim, or
-    a Shader placed outside a Material / NodeGraph. Composition stays
-    valid at runtime, but downstream tools that rely on proper scene
-    graph shape (renderers, importers, USDZ packagers) will misbehave
-    or emit warnings.
+    `PrimEncapsulationChecker` flagged an encapsulation violation that
+    does not match one of the recognized sub-cases. See the raw
+    message for specifics.
   suggestion: |
-    Move the flagged prim one level up: Boundables belong under Xform
-    or Scope parents, never under another Gprim. Shaders must live
-    inside a Material or NodeGraph (Container-like Connectable) —
-    never at stage root and never nested under another Shader.
+    Revisit the flagged prim's ancestors: Boundables must not sit
+    under other Gprims, Shaders must live under a Material or
+    NodeGraph with no non-Container prim in between.
 
-# --------------------------------------------------------------------
-# Shading
-# --------------------------------------------------------------------
-
-- rule: ShaderPropertyTypeConformanceChecker
-  title: "Shader input type non-conforming"
-  explanation: |
-    A shader input has a type different from what the UsdShade schema
-    expects (e.g. 'float3' instead of 'color3f'). The renderer may
-    reject the shader or produce incorrect rendering.
-  suggestion: |
-    Fix the input type in the .usda source to match the expected type
-    (see the raw message for the exact type mismatch).
+# ====================================================================
+# NormalMapTextureChecker
+# ====================================================================
+# Emits up to six distinct messages covering: non-Shader source,
+# unresolved texture, wrong sourceColorSpace, missing scale/bias,
+# non-standard scale values, and non-standard bias values. The last
+# two are warnings; the rest are failed checks.
 
 - rule: NormalMapTextureChecker
-  title: "8-bit normal map without scale/bias"
+  match: "is connected to a non-Shader prim"
+  title: "PreviewSurface `normal` input wired to a non-Shader prim"
   explanation: |
-    A UsdUVTexture reads an 8-bit normal map but inputs:scale and
-    inputs:bias are not configured. Consequence: the map is interpreted
-    as a color map, normals are wrong, and lighting will be incorrect.
-    Additionally, inputs:sourceColorSpace must be "raw" — otherwise
-    an sRGB transfer curve gets applied on top, further corrupting
-    the normals.
+    The `UsdPreviewSurface.normal` input is connected to a prim that
+    is not a Shader. Only a UsdUVTexture (optionally through a
+    NodeGraph passthrough) makes sense here — anything else means
+    the normal attribute is reading garbage.
   suggestion: |
-    On the UsdUVTexture shader prim, set:
-      inputs:scale             = (2, 2, 2, 1)
-      inputs:bias              = (-1, -1, -1, 0)
-      inputs:sourceColorSpace  = "raw"
+    Rewire `normal` to a UsdUVTexture Shader that loads the normal
+    map. Do not connect it directly to geometry, materials, or
+    primvar readers.
 
-# --------------------------------------------------------------------
-# Material / skel binding (applied-schema hygiene)
-# --------------------------------------------------------------------
+- rule: NormalMapTextureChecker
+  match: "has invalid or unresolvable inputs:file"
+  title: "Normal map UsdUVTexture cannot resolve its `inputs:file`"
+  explanation: |
+    The UsdUVTexture feeding the PreviewSurface's normal input points
+    at a texture asset that the asset resolver cannot locate. The
+    PreviewSurface will fall back to flat normals.
+  suggestion: |
+    Fix the `inputs:file = @…@` asset path on the UsdUVTexture shader.
+    Make sure the file exists next to the .usda (relative) or that
+    the full path resolves on the consumer's machine.
+
+- rule: NormalMapTextureChecker
+  match: "should set inputs:sourceColorSpace to 'raw'"
+  title: "Normal map UsdUVTexture missing `sourceColorSpace = raw`"
+  explanation: |
+    The UsdUVTexture that feeds the PreviewSurface's normal input is
+    authored as an sRGB colour texture by default. Any sRGB transfer
+    curve applied on top corrupts the normal data (the vector math
+    in the shader assumes linear values). The asset will look
+    subtly wrong under lighting.
+  suggestion: |
+    On the UsdUVTexture Shader prim, set:
+        inputs:sourceColorSpace = "raw"
+
+- rule: NormalMapTextureChecker
+  match: "requires that inputs:scale be set"
+  title: "8-bit normal map missing `scale` and/or `bias`"
+  explanation: |
+    A UsdUVTexture is feeding an 8-bit normal map into PreviewSurface
+    without the (2,2,2,1) scale and (-1,-1,-1,0) bias needed to
+    remap from [0..1] (texture domain) to [-1..1] (normal domain).
+    Result: normals are interpreted as colour, lighting is wrong.
+  suggestion: |
+    On the UsdUVTexture Shader prim, set:
+        inputs:scale             = (2, 2, 2, 1)
+        inputs:bias              = (-1, -1, -1, 0)
+        inputs:sourceColorSpace  = "raw"
+    All three are required together for an 8-bit map.
+
+- rule: NormalMapTextureChecker
+  match: "non-standard inputs:scale value"
+  title: "8-bit normal map has non-standard `scale`"
+  explanation: |
+    The UsdUVTexture's `scale` is present but not `(2, 2, 2, 1)`. That
+    is sometimes intentional (artists use scale to attenuate or boost
+    the normal effect), but it also defeats the PreviewSurface
+    convention that normals live in [-1, 1] tangent space. Downstream
+    renderers may produce unexpected lighting.
+  suggestion: |
+    If the deviation is intentional, ignore this warning. Otherwise
+    set `inputs:scale = (2, 2, 2, 1)`.
+
+- rule: NormalMapTextureChecker
+  match: "non-standard inputs:bias value"
+  title: "8-bit normal map has non-standard `bias`"
+  explanation: |
+    With a standard `(2, 2, 2, 1)` scale, the companion `bias` should
+    be `(-1, -1, -1, 0)` to land normals in the [-1, 1] tangent-space
+    range. The current bias is different, so the lighting convention
+    is broken.
+  suggestion: |
+    Set `inputs:bias = (-1, -1, -1, 0)` on the UsdUVTexture Shader.
+
+- rule: NormalMapTextureChecker
+  title: "Normal map issue"
+  explanation: |
+    `NormalMapTextureChecker` flagged a normal-map related problem
+    that does not match one of the recognized sub-cases. See the
+    raw message for specifics.
+  suggestion: |
+    Review the UsdUVTexture shader feeding the PreviewSurface's
+    `normal` input: it should have sourceColorSpace = "raw",
+    scale = (2,2,2,1), bias = (-1,-1,-1,0) for 8-bit normal maps.
+
+# ====================================================================
+# ShaderPropertyTypeConformanceChecker
+# ====================================================================
+# Four distinct sub-cases: missing sourceType, invalid implementation
+# source, missing sdrShaderNode, and the property-type mismatch itself.
+
+- rule: ShaderPropertyTypeConformanceChecker
+  match: "has no sourceType"
+  title: "Shader has no `sourceType`"
+  explanation: |
+    The Shader has no declared `sourceType` and no fallback source
+    asset either. UsdShade cannot resolve which Sdr shader node it
+    corresponds to, so property types cannot be validated and the
+    renderer has nothing to dispatch against.
+  suggestion: |
+    Declare a sourceType on the Shader. Common values:
+        sourceType = "glslfx"   # Storm / Hydra
+        sourceType = "OSL"      # Arnold / Renderman
+        sourceType = "mdl"      # MaterialX
+    Or switch the shader to use `info:id` with a registered
+    identifier like `UsdPreviewSurface`.
+
+- rule: ShaderPropertyTypeConformanceChecker
+  match: "has invalid implementation source"
+  title: "Shader has invalid `info:implementationSource`"
+  explanation: |
+    The Shader's `info:implementationSource` is not one of
+    `"id"`, `"sourceAsset"`, or `"sourceCode"`. UsdShade does not
+    know how to look up the shader node definition.
+  suggestion: |
+    Pick a supported implementation source:
+        info:implementationSource = "id"            # use info:id
+        info:implementationSource = "sourceAsset"   # external .osl / .mdl / …
+        info:implementationSource = "sourceCode"    # inline source code
+
+- rule: ShaderPropertyTypeConformanceChecker
+  match: "has invalid shader node"
+  title: "Shader identifier not found in Sdr registry"
+  explanation: |
+    The Shader's `info:id` points to an identifier that the Sdr
+    (Shader Definition Registry) does not know about. No Sdr shader
+    node is loaded for that identifier, so property types cannot
+    be validated.
+  suggestion: |
+    Either set `info:id` to a known node identifier (e.g.
+    `UsdPreviewSurface`, `UsdUVTexture`), or register the custom
+    shader in the Sdr plugin system before loading the stage.
+
+- rule: ShaderPropertyTypeConformanceChecker
+  match: "Incorrect type for"
+  title: "Shader input type does not match the Sdr definition"
+  explanation: |
+    A shader input is authored with a different Sdf type than the
+    one the Sdr shader node expects (e.g. `float3` authored where
+    the node expects `color3f`). Renderers may either reject the
+    shader outright or interpret the value with the wrong semantics,
+    both of which show up as wrong colours / wrong geometry.
+  suggestion: |
+    Fix the authored type to match the Sdr definition. The raw
+    message shows `Expected '<sdr type>'; got '<authored type>'` —
+    change the authored type to the expected one in the .usda.
+
+- rule: ShaderPropertyTypeConformanceChecker
+  title: "Shader property conformance issue"
+  explanation: |
+    `ShaderPropertyTypeConformanceChecker` flagged a shader property
+    problem that does not match one of the recognized sub-cases.
+  suggestion: |
+    Inspect the Shader prim: check its implementationSource, sourceType,
+    info:id, and input types against the Sdr definition of the shader
+    node identifier.
+
+# ====================================================================
+# MaterialBindingAPIAppliedChecker
+# ====================================================================
+# Single message.
 
 - rule: MaterialBindingAPIAppliedChecker
-  title: "MaterialBindingAPI not applied"
+  match: "MaterialBindingAPI applied"
+  title: "`material:binding` present but `MaterialBindingAPI` not applied"
   explanation: |
-    A prim declares a material:binding relationship but has not had
-    MaterialBindingAPI applied as a schema. Renderers and tools that
-    use the applied-API to drive binding resolution will skip the
+    The prim has a `material:binding` relationship but does not have
+    `MaterialBindingAPI` applied as a schema. Renderers that use
+    the applied-API surface to drive binding resolution skip the
     binding entirely — the prim ends up rendering with no material.
   suggestion: |
     Apply the schema. In Python:
@@ -126,13 +462,28 @@
     In .usda source:
         prepend apiSchemas = ["MaterialBindingAPI"]
 
-- rule: SkelBindingAPIAppliedChecker
-  title: "SkelBindingAPI not applied"
+- rule: MaterialBindingAPIAppliedChecker
+  title: "Material binding API issue"
   explanation: |
-    A prim carries skel-binding properties (skel:joints,
-    skel:blendShapes, skel:skeleton…) but SkelBindingAPI has not been
-    applied as a schema. Skeleton-aware consumers will ignore the
-    binding entirely — the skin/pose information is effectively
+    `MaterialBindingAPIAppliedChecker` flagged a material-binding
+    problem that does not match the recognized sub-case.
+  suggestion: |
+    Check the prim's applied API schemas and its `material:binding`
+    relationship authoring.
+
+# ====================================================================
+# SkelBindingAPIAppliedChecker
+# ====================================================================
+# Two distinct sub-cases.
+
+- rule: SkelBindingAPIAppliedChecker
+  match: "no SkelBindingAPI applied"
+  title: "Skel-binding property present but `SkelBindingAPI` not applied"
+  explanation: |
+    The prim carries a `skel:*` property (joints, blendShapes,
+    skeleton, jointIndices, jointWeights, …) but `SkelBindingAPI`
+    is not applied as a schema. Skeleton-aware consumers ignore
+    the binding, so the pose and skinning data is effectively
     orphaned.
   suggestion: |
     Apply the schema. In Python:
@@ -140,31 +491,83 @@
     In .usda source:
         prepend apiSchemas = ["SkelBindingAPI"]
 
-# --------------------------------------------------------------------
-# .usdz packaging
-# --------------------------------------------------------------------
+- rule: SkelBindingAPIAppliedChecker
+  match: "not rooted at a prim of type SkelRoot"
+  title: "`SkelBindingAPI` applied outside a SkelRoot subtree"
+  explanation: |
+    `SkelBindingAPI` is applied on a prim that is neither a SkelRoot
+    nor a descendant of one. The UsdSkel schema requires skinning
+    data to live under a SkelRoot so that consumers can find and
+    evaluate the skeleton. Outside of a SkelRoot, the binding is
+    silently ignored.
+  suggestion: |
+    Wrap the prim (or one of its ancestors) in a SkelRoot:
+        def SkelRoot "Character" {
+            def Mesh "Body" (
+                prepend apiSchemas = ["SkelBindingAPI"]
+            ) { ... }
+        }
+
+- rule: SkelBindingAPIAppliedChecker
+  title: "Skel binding API issue"
+  explanation: |
+    `SkelBindingAPIAppliedChecker` flagged a skeleton-binding problem
+    that does not match one of the recognized sub-cases.
+  suggestion: |
+    Check the prim's applied API schemas and its SkelRoot ancestry.
+
+# ====================================================================
+# ByteAlignmentChecker (.usdz)
+# ====================================================================
+# Single message. The .usdz spec requires each entry to start on a
+# 64-byte boundary so consumers can mmap the payload directly.
 
 - rule: ByteAlignmentChecker
+  match: "invalid offset"
   title: ".usdz entry not 64-byte aligned"
   explanation: |
-    A file inside the .usdz package is not aligned to a 64-byte
-    boundary. The .usdz spec requires this so readers can mmap the
-    payload directly; without alignment, the consumer either falls
-    back to a copy (slow) or fails to open the file.
+    A file inside the .usdz package does not start on a 64-byte
+    boundary. The .usdz spec mandates this so consumers can mmap
+    the payload directly without a copy. Misaligned archives
+    either fall back to a slow copy path or fail to open at all.
   suggestion: |
-    Rebuild the package with UsdUtils.CreateNewUsdzPackage(...) or
-    the `usdzip` CLI — both handle alignment automatically. Never
-    build the archive by hand with stdlib zipfile without explicit
-    padding, or the alignment invariant will silently break.
+    Rebuild the archive with `UsdUtils.CreateNewUsdzPackage(...)` or
+    the `usdzip` CLI — both handle alignment automatically. If you
+    must build by hand with stdlib `zipfile`, insert padding bytes
+    before each entry's data offset to land on a 64 B boundary.
+
+- rule: ByteAlignmentChecker
+  title: ".usdz alignment issue"
+  explanation: |
+    `ByteAlignmentChecker` flagged an alignment problem in the .usdz
+    package that does not match the recognized sub-case.
+  suggestion: |
+    Rebuild the archive with `UsdUtils.CreateNewUsdzPackage(...)` so
+    the tooling handles the 64-byte alignment contract for you.
+
+# ====================================================================
+# CompressionChecker (.usdz)
+# ====================================================================
+# Single message. The .usdz spec requires "stored" (uncompressed) mode.
 
 - rule: CompressionChecker
-  title: ".usdz contains compressed or encrypted entries"
+  match: "has compression"
+  title: ".usdz entry is compressed or encrypted"
   explanation: |
     The .usdz spec requires files inside the package to be stored
-    uncompressed and unencrypted (zip "stored" mode). Readers expect
-    to mmap the payload directly; DEFLATE or any cipher breaks that
-    contract and the package fails to load.
+    uncompressed and unencrypted (zip "stored" mode). Consumers
+    mmap the payload directly; a compressed or encrypted entry
+    breaks that contract and the package fails to open.
   suggestion: |
-    Rebuild with UsdUtils.CreateNewUsdzPackage(...) (uses "stored"
-    mode). If you are using a generic zip tool, pass the equivalent
-    of `-0` / no compression, and do not apply zip encryption.
+    Rebuild with `UsdUtils.CreateNewUsdzPackage(...)` — it uses the
+    "stored" mode. If using a generic zip tool, pass the equivalent
+    of `-0` (no compression) and do not apply zip encryption.
+
+- rule: CompressionChecker
+  title: ".usdz compression issue"
+  explanation: |
+    `CompressionChecker` flagged a compression problem in the .usdz
+    package that does not match the recognized sub-case.
+  suggestion: |
+    Rebuild with `UsdUtils.CreateNewUsdzPackage(...)` so the archive
+    ends up in uncompressed "stored" mode.

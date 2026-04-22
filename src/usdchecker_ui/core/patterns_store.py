@@ -53,6 +53,12 @@ def _load_yaml_list(path: Path) -> list[dict]:
 
 
 def _as_index(entries: list[dict], source: str = "?") -> PatternsDict:
+    """Group flat YAML entries by `rule` into ordered sub-pattern lists.
+
+    Entries for the same rule are preserved in file order. The enricher
+    relies on that order: specific `match:` substrings must come before
+    any catch-all entry (one with no `match:` field) for the same rule.
+    """
     out: PatternsDict = {}
     for entry in entries:
         rule = entry.get("rule") if isinstance(entry, dict) else None
@@ -62,31 +68,48 @@ def _as_index(entries: list[dict], source: str = "?") -> PatternsDict:
                 stacklevel=2,
             )
             continue
-        out[rule] = {
+        out.setdefault(rule, []).append({
+            "match": entry.get("match"),
             "title": entry.get("title"),
             "explanation": entry.get("explanation"),
             "suggestion": entry.get("suggestion"),
-        }
+        })
     return out
 
 
 _USER_STUB = """# USDChecker UI — user override patterns.
 #
-# Entries in this file override the bundled defaults RULE-BY-RULE.
-# Any rule NOT listed here falls through to the bundled patterns.yaml
-# that ships inside the app. This means new/updated bundled rules keep
-# working automatically — you only need to add entries for rules you
-# actually want to customize.
+# Override semantics:
+#   - Overrides apply RULE BY RULE. If you list any entry for a given
+#     rule here, it replaces ALL bundled entries for that rule. Rules
+#     you don't list keep their bundled behavior.
+#   - A rule can emit several distinct raw messages (e.g.
+#     StageMetadataChecker flags missing upAxis, missing metersPerUnit,
+#     missing defaultPrim, and non-Y upAxis — four different problems
+#     with the same rule name). The optional `match:` field targets a
+#     specific sub-case by matching a substring of the raw message.
+#     List specific entries FIRST, end with a no-`match` catch-all.
+#   - Order matters: the enricher walks your entries top-down and stops
+#     at the first match.
 #
-# Format (copy the template, uncomment, edit):
+# Template (copy, uncomment, tweak):
 #
-# - rule: NormalMapTextureChecker
-#   title: Your short title
+# - rule: StageMetadataChecker
+#   match: "missing or invalid defaultPrim"
+#   title: Scene has no default prim
 #   explanation: |
-#     Multi-line explanation. Plain text or markdown — rendered in the
-#     detail panel.
+#     Multi-line explanation targeting THIS specific sub-case.
 #   suggestion: |
-#     Multi-line fix suggestion.
+#     Concrete fix for THIS sub-case.
+#
+# - rule: StageMetadataChecker
+#   # No `match` field = catch-all for this rule. Used when none of the
+#   # specific entries above hit.
+#   title: Stage metadata issue
+#   explanation: |
+#     Generic fallback explanation.
+#   suggestion: |
+#     Generic fix suggestion.
 
 []
 """
