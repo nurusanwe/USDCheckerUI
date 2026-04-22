@@ -1,0 +1,79 @@
+name: macOS build
+
+# Manual trigger — click "Run workflow" on the Actions tab when you need
+# a fresh .app to smoke-test. Runs ruff + lint-imports + pytest before
+# packaging, so AC 10 / AC 12 are verified on every build.
+#
+# Artifact: USDCheckerUI-macos-arm64 (dist/USDCheckerUI.app contents).
+# Download it from the run page, unzip, launch USDCheckerUI.app.
+#
+# macos-latest on GitHub runners is Apple Silicon (arm64), matching
+# target_arch="arm64" in packaging/pyinstaller.macos.spec. No signing
+# / notarization in this iteration — first launch on a peer's machine
+# may need:
+#     xattr -d com.apple.quarantine USDCheckerUI.app
+
+on:
+  workflow_dispatch: {}
+
+# Opt JavaScript-based actions into the Node.js 24 runtime to silence
+# the Node 20 deprecation notice (same story as windows-build.yml).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      # Belt + braces: if a runner image ever ships with PYTHONPATH set
+      # to a hand-built USD path, we would segfault on `from pxr import Tf`.
+      # Empty string scrubs it without relying on shell conditionals.
+      PYTHONPATH: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Import-linter (core-no-qt contract)
+        run: lint-imports
+
+      - name: Pytest
+        run: pytest
+
+      - name: Clean build + dist trees
+        run: rm -rf build dist
+
+      - name: Build macOS .app (PyInstaller)
+        run: pyinstaller packaging/pyinstaller.macos.spec --noconfirm
+
+      - name: Report bundle size
+        run: |
+          size_bytes=$(du -s -k dist/USDCheckerUI.app | cut -f1)
+          size_mb=$((size_bytes / 1024))
+          echo "Bundle size: ${size_mb} MB"
+          echo "Baseline (spec): ~205 MB. If this creeps above ~350 MB,"
+          echo "consider --exclude-module pxr.UsdImagingGL / pxr.Hgi*"
+          echo "in packaging/pyinstaller.macos.spec (rendering modules"
+          echo "unused by the validator)."
+
+      - name: Upload .app as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: USDCheckerUI-macos-arm64
+          path: dist/USDCheckerUI.app
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
