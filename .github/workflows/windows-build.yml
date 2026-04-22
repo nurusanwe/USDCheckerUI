@@ -15,6 +15,14 @@ name: Windows build
 on:
   workflow_dispatch: {}
 
+# Opt into the Node.js 24 runtime for all JavaScript-based actions in
+# this workflow. Silences the deprecation notice raised on every run by
+# actions/checkout + actions/setup-python running under the default
+# Node 20. Node 20 is slated for removal from runners on 2026-09-16; see
+# https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: windows-latest
