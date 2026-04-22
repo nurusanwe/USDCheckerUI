@@ -69,11 +69,23 @@ jobs:
           echo "in packaging/pyinstaller.macos.spec (rendering modules"
           echo "unused by the validator)."
 
+      # actions/upload-artifact@v4 strips the longest common parent
+      # from paths it uploads. Pointing `path:` directly at the .app
+      # would put Contents/ at the zip root and drop the .app wrapper,
+      # leaving downloaders with a folder macOS does not treat as an
+      # application. Staging the bundle under a sibling directory makes
+      # the staging dir the common parent, so USDCheckerUI.app survives
+      # as a top-level entry inside the artifact.
+      - name: Stage .app under a wrapper dir
+        run: |
+          mkdir -p artifact-staging
+          mv dist/USDCheckerUI.app artifact-staging/
+
       - name: Upload .app as artifact
         uses: actions/upload-artifact@v4
         with:
           name: USDCheckerUI-macos-arm64
-          path: dist/USDCheckerUI.app
+          path: artifact-staging
           if-no-files-found: error
           retention-days: 30
           compression-level: 6
