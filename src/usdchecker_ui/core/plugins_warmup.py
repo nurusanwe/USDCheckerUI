@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import importlib
 
-
 # Every pxr schema package that ships a compiled _<name>.so in the
 # usd-core wheel. Importing each one runs its TF_REGISTRY_FUNCTION
 # bootstraps and registers the TfTypes the schema registry needs.
