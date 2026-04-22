@@ -15,14 +15,6 @@ name: Windows build
 on:
   workflow_dispatch: {}
 
-# Opt into the Node.js 24 runtime for all JavaScript-based actions in
-# this workflow. Silences the deprecation notice raised on every run by
-# actions/checkout + actions/setup-python running under the default
-# Node 20. Node 20 is slated for removal from runners on 2026-09-16; see
-# https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: windows-latest
@@ -35,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -73,7 +65,7 @@ jobs:
           Write-Host "If this exceeds ~400 MB, add pxr.UsdImagingGL / pxr.Hgi* to excludes in pyinstaller.windows.spec."
 
       - name: Upload exe as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: USDCheckerUI-windows-x64
           path: dist/USDCheckerUI/

@@ -16,11 +16,6 @@ name: macOS build
 on:
   workflow_dispatch: {}
 
-# Opt JavaScript-based actions into the Node.js 24 runtime to silence
-# the Node 20 deprecation notice (same story as windows-build.yml).
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: macos-latest
@@ -32,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -69,9 +64,9 @@ jobs:
           echo "in packaging/pyinstaller.macos.spec (rendering modules"
           echo "unused by the validator)."
 
-      # actions/upload-artifact@v4 strips the longest common parent
-      # from paths it uploads. Pointing `path:` directly at the .app
-      # would put Contents/ at the zip root and drop the .app wrapper,
+      # actions/upload-artifact strips the longest common parent from
+      # paths it uploads. Pointing `path:` directly at the .app would
+      # put Contents/ at the zip root and drop the .app wrapper,
       # leaving downloaders with a folder macOS does not treat as an
       # application. Staging the bundle under a sibling directory makes
       # the staging dir the common parent, so USDCheckerUI.app survives
@@ -82,7 +77,7 @@ jobs:
           mv dist/USDCheckerUI.app artifact-staging/
 
       - name: Upload .app as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: USDCheckerUI-macos-arm64
           path: artifact-staging
