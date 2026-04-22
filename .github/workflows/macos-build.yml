@@ -64,23 +64,33 @@ jobs:
           echo "in packaging/pyinstaller.macos.spec (rendering modules"
           echo "unused by the validator)."
 
-      # actions/upload-artifact strips the longest common parent from
-      # paths it uploads. Pointing `path:` directly at the .app would
-      # put Contents/ at the zip root and drop the .app wrapper,
-      # leaving downloaders with a folder macOS does not treat as an
-      # application. Staging the bundle under a sibling directory makes
-      # the staging dir the common parent, so USDCheckerUI.app survives
-      # as a top-level entry inside the artifact.
-      - name: Stage .app under a wrapper dir
+      # actions/upload-artifact zips whatever `path:` points at using
+      # a plain archive format that does NOT preserve macOS-specific
+      # metadata — crucially, symlinks get dereferenced into full file
+      # copies. PyInstaller's .app bundle relies heavily on symlinks
+      # from Contents/Resources/ into Contents/Frameworks/ (pxr/,
+      # PySide6/, libusd_ms.dylib, every Qt framework, ...). When those
+      # symlinks become copies, pxr.Plug.Registry discovers every
+      # plugInfo.json twice and UsdSchemaRegistry aborts with a null
+      # smart-ptr dereference at init time — the .app crashes before
+      # its first frame.
+      #
+      # `ditto -c -k --sequesterRsrc --keepParent` creates a macOS-
+      # aware zip that preserves symlinks, resource forks, and xattrs.
+      # Finder handles this zip natively: double-click yields a
+      # working .app with its internal symlinks intact.
+      - name: Repackage .app with ditto (preserve symlinks)
         run: |
-          mkdir -p artifact-staging
-          mv dist/USDCheckerUI.app artifact-staging/
+          ditto -c -k --sequesterRsrc --keepParent \
+              dist/USDCheckerUI.app USDCheckerUI.app.zip
+          echo "ditto-zipped size:"
+          ls -lh USDCheckerUI.app.zip
 
-      - name: Upload .app as artifact
+      - name: Upload .app zip as artifact
         uses: actions/upload-artifact@v7
         with:
           name: USDCheckerUI-macos-arm64
-          path: artifact-staging
+          path: USDCheckerUI.app.zip
           if-no-files-found: error
           retention-days: 30
-          compression-level: 6
+          compression-level: 0  # ditto already compressed; skip double-pass
