@@ -1,0 +1,74 @@
+name: Windows build
+
+# Manual trigger — click "Run workflow" on the Actions tab when you need
+# a fresh .exe to smoke-test. Runs ruff + lint-imports + pytest before
+# packaging, so AC 9 / AC 12 are verified on every build.
+#
+# Artifact: USDCheckerUI-windows-x64 (dist/USDCheckerUI/ contents).
+# Download it from the run page, unzip, run USDCheckerUI.exe.
+#
+# The windows-latest runner (Windows Server 2022 x64) ships with
+# Visual C++ 2015-2022 Redistributable preinstalled, so usd-core's .pyd
+# files load cleanly. End-user machines still need vc_redist.x64.exe —
+# see README "Windows — Requirements".
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      # Belt + braces: the runner doesn't set PYTHONPATH, but an empty
+      # value shields against a hand-built USD install ever leaking in
+      # via the matrix env in the future (see tech-spec § PYTHONPATH
+      # pitfall).
+      PYTHONPATH: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Import-linter (core-no-qt contract)
+        run: lint-imports
+
+      - name: Pytest
+        run: pytest
+
+      - name: Clean build + dist trees
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
+
+      - name: Build Windows exe (PyInstaller)
+        run: pyinstaller packaging\pyinstaller.windows.spec --noconfirm
+
+      - name: Report bundle size
+        shell: pwsh
+        run: |
+          $size = (Get-ChildItem -Recurse dist\USDCheckerUI | Measure-Object -Property Length -Sum).Sum
+          $mb = [math]::Round($size / 1MB, 1)
+          Write-Host "Bundle size: $mb MB"
+          Write-Host "If this exceeds ~400 MB, add pxr.UsdImagingGL / pxr.Hgi* to excludes in pyinstaller.windows.spec."
+
+      - name: Upload exe as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: USDCheckerUI-windows-x64
+          path: dist/USDCheckerUI/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
