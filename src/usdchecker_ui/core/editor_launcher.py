@@ -17,8 +17,25 @@ class EditorNotAvailableError(Exception):
     """Raised when the `code` CLI is not on PATH."""
 
 
+class EditorLaunchFailedError(Exception):
+    """Raised when `code` was resolved but launching it failed.
+
+    Distinct from EditorNotAvailableError so the UI can react differently:
+    missing CLI is a one-time installation prompt (QMessageBox); launch
+    failure is a transient per-action glitch (status-bar toast).
+    """
+
+
+def resolve_vscode_path() -> str | None:
+    # shutil.which consults PATHEXT on Windows, so it correctly resolves
+    # `code` → `code.cmd`. The returned full path is what we feed Popen —
+    # the bare string "code" would fail in Windows CreateProcess because
+    # CreateProcess does NOT consult PATHEXT.
+    return shutil.which("code")
+
+
 def is_vscode_available() -> bool:
-    return shutil.which("code") is not None
+    return resolve_vscode_path() is not None
 
 
 # Matches `def`, `over`, `class` declarations, with optional type token.
@@ -55,7 +72,11 @@ def find_prim_line(usda_path: Path, prim_path: str) -> tuple[int, bool]:
 
 def open_in_vscode(file: Path, line: int | None) -> None:
     """Open `file` in VSCode at `line` (or line 1 if None)."""
-    if not is_vscode_available():
+    resolved = resolve_vscode_path()
+    if resolved is None:
         raise EditorNotAvailableError("VSCode CLI `code` not found on PATH")
     target = f"{file}:{line or 1}:1"
-    subprocess.Popen(["code", "--goto", target])
+    try:
+        subprocess.Popen([resolved, "--goto", target])
+    except OSError as exc:
+        raise EditorLaunchFailedError(str(exc)) from exc

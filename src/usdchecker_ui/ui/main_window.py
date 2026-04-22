@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -25,12 +26,36 @@ from usdchecker_ui.ui.drop_zone import DropZone
 from usdchecker_ui.ui.filter_bar import FilterBar
 from usdchecker_ui.ui.toolbar import MainToolbar
 
-# Exposed for AC 19 regression test (tests/test_main_window_text.py).
-VSCODE_MISSING_TEXT = (
-    "VSCode CLI (`code`) not found. Open VSCode → Cmd+Shift+P "
-    "→ type 'Shell Command: Install \"code\" command in PATH' "
-    "→ relaunch USDChecker UI."
-)
+
+def _vscode_missing_text(platform: str) -> str:
+    """Return the VSCode-missing message appropriate for `platform`.
+
+    Pure function of its argument so tests can exercise every branch on
+    any host. Arrows are written as `\\u2192` escapes to prevent a
+    copy-paste mishap from silently swapping the glyph for a lookalike.
+    """
+    arrow = "→"  # RIGHTWARDS ARROW — explicit escape; see F22 in tech spec.
+    if platform == "darwin":
+        return (
+            f"VSCode CLI (`code`) not found. Open VSCode {arrow} Cmd+Shift+P "
+            f"{arrow} type 'Shell Command: Install \"code\" command in PATH' "
+            f"{arrow} relaunch USDChecker UI."
+        )
+    if platform.startswith("win"):
+        return (
+            f"VSCode CLI (`code`) not found. Open VSCode {arrow} Ctrl+Shift+P "
+            f"{arrow} type 'Shell: Install \"code\" command in PATH', or "
+            f"reinstall VSCode with 'Add to PATH' checked "
+            f"{arrow} relaunch USDChecker UI."
+        )
+    return (
+        "VSCode CLI (`code`) not found. Install VSCode and ensure `code` "
+        "is on PATH, then relaunch USDChecker UI."
+    )
+
+
+# Exposed for the AC 8 regression test (tests/test_main_window_text.py).
+VSCODE_MISSING_TEXT = _vscode_missing_text(sys.platform)
 
 _ERROR_HEADLINE = {
     "FILE_NOT_FOUND": "File not found",
@@ -202,6 +227,8 @@ class MainWindow(QMainWindow):
                 self._toast("Ambiguous prim — opened at root.", duration_ms=5000)
         except editor_launcher.EditorNotAvailableError:
             QMessageBox.warning(self, "VSCode not found", VSCODE_MISSING_TEXT)
+        except editor_launcher.EditorLaunchFailedError as exc:
+            self._toast(f"VSCode launch failed: {exc}", duration_ms=6000)
 
     def _on_edit_patterns(self) -> None:
         patterns_store.open_for_edit()

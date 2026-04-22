@@ -1,7 +1,7 @@
 # PyInstaller spec for USDChecker UI (Mac ARM, .app bundle).
 #
 # Run from repo root:
-#     pyinstaller packaging/pyinstaller.spec --noconfirm
+#     pyinstaller packaging/pyinstaller.macos.spec --noconfirm
 #
 # Output: dist/USDCheckerUI.app
 # Bundle size is not capped — measure post-build and report in README.

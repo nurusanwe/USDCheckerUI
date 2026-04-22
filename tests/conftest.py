@@ -10,27 +10,44 @@ from __future__ import annotations
 # If PYTHONPATH points at a hand-built USD install (common on dev boxes),
 # it takes precedence over the venv's usd-core wheel and can segfault on
 # ABI mismatch. We scrub any such path from sys.path at conftest load.
+import contextlib as _contextlib
 import sys as _sys
 import sysconfig as _sysconfig
+from pathlib import Path as _Path
 
-# Drop any sys.path entry that exposes a pxr package outside the venv —
-# hand-built USD installs on dev boxes commonly leak in via PYTHONPATH and
-# clash with usd-core's ABI, segfaulting the process. Explicit parens so
-# the precedence is obvious and a falsy `_venv_site` can't empty sys.path.
+# Anchors a sys.path entry must live under to survive the scrub. Using
+# sysconfig is portable — the old substring heuristic matched
+# "python3.12/lib", which never appears in Windows stdlib paths
+# (C:\Python312\Lib), so the Windows stdlib got silently dropped.
+_project_root = _Path(__file__).resolve().parents[1]
 _venv_site = _sysconfig.get_paths().get("purelib")
-_project_root = str(__import__("pathlib").Path(__file__).resolve().parents[1])
 
 
 def _keep_path(p: str) -> bool:
     if not p:
         return True
-    if _venv_site and p.startswith(_venv_site):
-        return True
-    # Python stdlib + lib-dynload (framework paths).
-    if "Python.framework" in p or "python3.12/lib" in p.replace("\\", "/"):
-        return True
-    # Project itself (src/ layout + repo root).
-    return p == _project_root or p.startswith(_project_root + "/")
+    try:
+        resolved = _Path(p).resolve()
+    except OSError:
+        return False
+    paths = _sysconfig.get_paths()
+    anchors: list[_Path] = []
+    for key in ("purelib", "stdlib", "platstdlib", "platlib"):
+        raw = paths.get(key)
+        if raw:
+            try:
+                anchors.append(_Path(raw).resolve())
+            except OSError:
+                continue
+    with _contextlib.suppress(OSError):
+        anchors.append(_project_root.resolve())
+    for anchor in anchors:
+        try:
+            resolved.relative_to(anchor)
+            return True
+        except ValueError:
+            continue
+    return False
 
 
 _sys.path[:] = [p for p in _sys.path if _keep_path(p)]
