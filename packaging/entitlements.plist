@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Minimal entitlements. USDChecker UI only needs to read user-selected
+       files via QFileDialog + drag-drop. If notarization/distribution
+       later requires JIT or library-validation exceptions (unlikely),
+       add them explicitly — do NOT blanket-disable library validation
+       since that weakens macOS code signing guarantees for no gain on
+       an unsigned dev build. -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+</dict>
+</plist>

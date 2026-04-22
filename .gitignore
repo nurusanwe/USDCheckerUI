@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+ENV/
+
+# Build / dist
+build/
+dist/
+*.spec.lock
+
+# PyInstaller work dir
+*.manifest
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+.import_linter_cache/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code artifacts (never committed)
+.claude/
+CLAUDE.md
+
+# Large USD test corpus (reference via USDCHECKER_UI_TEST_CORPUS)
+# and tiny .usdz fixtures are built lazily by conftest.py at test time
+# (not committed — rebuilt from the text .usda source).
+*.usdz
+
+# Lazily generated fixtures (rebuilt by conftest.py on first test run).
+tests/fixtures/red.png
+
+# NOTE: _bmad-output/ is intentionally NOT ignored — contains the tech spec.

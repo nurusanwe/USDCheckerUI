@@ -1,0 +1,50 @@
+# Corpus of raw accessor strings + expected parse shapes.
+# Consumed by tests/test_parser.py (parametrized).
+
+- id: errors_shape_with_prim_and_asset
+  source: errors
+  severity: error
+  raw: "Error checking rule 'NormalMapTextureChecker': UsdUVTexture prim </World/Mat/NormalTex> reads 8 bit Normal Map @red.png@, which requires that inputs:scale be set to (2, 2, 2, 1)."
+  expected_rule: NormalMapTextureChecker
+  expected_prim: /World/Mat/NormalTex
+  expected_asset: red.png
+
+- id: errors_shape_prim_only
+  source: errors
+  severity: error
+  raw: "Error checking rule 'PrimEncapsulationChecker': Connectable prim </World/Bad> has an encapsulation issue."
+  expected_rule: PrimEncapsulationChecker
+  expected_prim: /World/Bad
+  expected_asset: null
+
+- id: warnings_shape_with_prim
+  source: warnings
+  severity: warning
+  raw: "UsdUVTexture prim </World/Mat/NormalTex> reads an 8 bit Normal Map, but has non-standard inputs:scale value (may violate 'NormalMapTextureChecker')"
+  expected_rule: NormalMapTextureChecker
+  expected_prim: /World/Mat/NormalTex
+  expected_asset: null
+
+- id: failed_checks_with_angle_prim
+  source: failed_checks
+  severity: error
+  raw: "Shader </World/Mat/Bad> has invalid shader node. (fails 'ShaderPropertyTypeConformanceChecker')"
+  expected_rule: ShaderPropertyTypeConformanceChecker
+  expected_prim: /World/Mat/Bad
+  expected_asset: null
+
+- id: failed_checks_with_plain_prim
+  source: failed_checks
+  severity: error
+  raw: "Incorrect type for /World/Mat/Shader.inputs:diffuseColor. Expected 'color3f'; got 'float3'. (fails 'ShaderPropertyTypeConformanceChecker')"
+  expected_rule: ShaderPropertyTypeConformanceChecker
+  expected_prim: /World/Mat/Shader.inputs:diffuseColor
+  expected_asset: null
+
+- id: fallback_gibberish
+  source: errors
+  severity: error
+  raw: "some completely unparseable gibberish that does not match any shape"
+  expected_rule: Unknown
+  expected_prim: null
+  expected_asset: null

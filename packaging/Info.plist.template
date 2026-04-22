@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Reference Info.plist for USDChecker UI.
+     PyInstaller generates the real Info.plist from the `info_plist` dict in
+     pyinstaller.spec; this template is kept as a hand-editable reference
+     for fields that might migrate there later (signing, notarization, etc.). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDisplayName</key>
+  <string>USDChecker UI</string>
+  <key>CFBundleName</key>
+  <string>USDCheckerUI</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.adobe.eclair.usdchecker-ui</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>0.1.0</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>LSMinimumSystemVersion</key>
+  <string>13.0</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>OpenUSD File</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>CFBundleTypeExtensions</key>
+      <array>
+        <string>usd</string>
+        <string>usda</string>
+        <string>usdc</string>
+        <string>usdz</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

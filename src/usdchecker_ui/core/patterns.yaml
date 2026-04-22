@@ -1,0 +1,26 @@
+# USDChecker UI — pattern dictionary (bundled default)
+#
+# Keyed by the exact rule name emitted by pxr.UsdUtils.ComplianceChecker.
+# The user override at ~/Library/Application Support/USDCheckerUI/patterns.yaml
+# wins rule-by-rule.
+
+- rule: NormalMapTextureChecker
+  title: "8-bit normal map without scale/bias"
+  explanation: |
+    A UsdUVTexture reads an 8-bit normal map but inputs:scale and
+    inputs:bias are not configured. Consequence: the map is interpreted
+    as a color map, normals are wrong, and lighting will be incorrect.
+  suggestion: |
+    On the UsdUVTexture shader prim, set:
+      inputs:scale = (2, 2, 2, 1)
+      inputs:bias  = (-1, -1, -1, 0)
+
+- rule: ShaderPropertyTypeConformanceChecker
+  title: "Shader input type non-conforming"
+  explanation: |
+    A shader input has a type different from what the UsdShade schema
+    expects (e.g. 'float3' instead of 'color3f'). The renderer may
+    reject the shader or produce incorrect rendering.
+  suggestion: |
+    Fix the input type in the .usda source to match the expected type
+    (see the raw message for the exact type mismatch).

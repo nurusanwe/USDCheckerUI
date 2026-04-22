@@ -1,0 +1,33 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1.0
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Mesh "Geom" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+        point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+        rel material:binding = </World/Mat>
+        uniform token subdivisionScheme = "none"
+    }
+
+    def Material "Mat"
+    {
+        token outputs:surface.connect = </World/Mat/Shader.outputs:surface>
+
+        def Shader "Shader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+            float inputs:roughness = 0.5
+            token outputs:surface
+        }
+    }
+}

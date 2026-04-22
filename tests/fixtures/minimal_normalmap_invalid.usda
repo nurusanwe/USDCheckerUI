@@ -1,0 +1,55 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1.0
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Mesh "Geom" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+        point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (0, 1)] (
+            interpolation = "vertex"
+        )
+        rel material:binding = </World/Mat>
+        uniform token subdivisionScheme = "none"
+    }
+
+    def Material "Mat"
+    {
+        token outputs:surface.connect = </World/Mat/Surface.outputs:surface>
+
+        def Shader "Surface"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+            normal3f inputs:normal.connect = </World/Mat/NormalTex.outputs:rgb>
+            float inputs:roughness = 0.5
+            token outputs:surface
+        }
+
+        def Shader "NormalTex"
+        {
+            uniform token info:id = "UsdUVTexture"
+            # 8-bit PNG referenced as a normal map WITHOUT inputs:scale and
+            # WITHOUT inputs:bias — triggers NormalMapTextureChecker.
+            asset inputs:file = @red.png@
+            token inputs:sourceColorSpace = "raw"
+            float2 inputs:st.connect = </World/Mat/Primvar.outputs:result>
+            float3 outputs:rgb
+        }
+
+        def Shader "Primvar"
+        {
+            uniform token info:id = "UsdPrimvarReader_float2"
+            token inputs:varname = "st"
+            float2 outputs:result
+        }
+    }
+}

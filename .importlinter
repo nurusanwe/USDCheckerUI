@@ -1,0 +1,13 @@
+[importlinter]
+root_package = usdchecker_ui
+include_external_packages = True
+
+[importlinter:contract:core-no-qt]
+name = Core must not import Qt
+type = forbidden
+source_modules =
+    usdchecker_ui.core
+forbidden_modules =
+    PySide6
+    PyQt6
+    PyQt5
