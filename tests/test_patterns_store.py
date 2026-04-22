@@ -66,6 +66,45 @@ def test_bundled_entries_reach_user_when_override_empty(
     assert "ShaderPropertyTypeConformanceChecker" in merged
 
 
+def test_bundled_covers_every_pxr_rule() -> None:
+    """Regression gate: the bundled patterns.yaml must carry an entry
+    for every rule currently shipped by pxr.UsdUtils.ComplianceChecker.
+
+    If pxr adds a new rule in a future usd-core release, this test
+    fails and signals that the bundled dictionary needs a new entry.
+    The alternative — silently shipping an un-enriched rule that shows
+    the raw pxr message in the UI — is exactly what patterns.yaml
+    exists to prevent.
+    """
+    pxr_utils = pytest.importorskip("pxr.UsdUtils")
+    expected = {r.__name__ for r in pxr_utils.ComplianceChecker().GetRules()}
+    bundled = patterns_store._as_index(
+        patterns_store._load_yaml_list(patterns_store.bundled_patterns_path()),
+        source="bundled",
+    )
+    missing = expected - set(bundled.keys())
+    assert not missing, (
+        f"Bundled patterns.yaml missing entries for: {sorted(missing)}. "
+        f"Add them to src/usdchecker_ui/core/patterns.yaml with a human "
+        f"title / explanation / suggestion."
+    )
+
+
+def test_bundled_entries_have_all_required_fields() -> None:
+    """Every bundled entry must carry a non-empty title, explanation,
+    and suggestion — otherwise the detail panel renders a blank card."""
+    bundled = patterns_store._as_index(
+        patterns_store._load_yaml_list(patterns_store.bundled_patterns_path()),
+        source="bundled",
+    )
+    for rule, entry in bundled.items():
+        for field in ("title", "explanation", "suggestion"):
+            value = entry.get(field)
+            assert value and value.strip(), (
+                f"Bundled rule {rule!r}: field {field!r} is missing or empty"
+            )
+
+
 def test_load_merged_user_override_wins(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
