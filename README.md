@@ -31,7 +31,7 @@ Supported platforms: **macOS 13+ ARM, Windows 10+ x64.**
 - VSCode is optional — only used by the "Open in VSCode" toolbar action.
 
 > **Shell note — PYTHONPATH.** If you have a hand-built USD install
-> exposed via `PYTHONPATH` (common on Eclair / USD-dev boxes), clear it
+> exposed via `PYTHONPATH` (common on USD-dev boxes), clear it
 > in the shell you run USDChecker UI from. The venv's `usd-core` wheel
 > must win so we link against a consistent ABI — otherwise you can get
 > a segfault on `from pxr import Tf`. Tests scrub `sys.path` in
@@ -264,6 +264,6 @@ To add a new rule, append to the user file:
 ## Architecture — why the strict `core/` / `ui/` split?
 
 `core/` is pure Python, **zero Qt**, enforced by `import-linter`. The
-long-term plan is to port this validation layer to an internal C++ ImGUI
-tool (Eclair Studio); keeping the core independent keeps that port
+long-term plan is to port this validation layer to a C++ ImGUI
+tool; keeping the core independent keeps that port
 cheap. `tests/test_architecture.py` runs the contract on every CI run.
