@@ -25,7 +25,11 @@ def test_user_patterns_path_points_at_app_support(
     p = patterns_store.user_patterns_path()
     assert p.parent.name == "USDCheckerUI"
     assert p.name == "patterns.yaml"
-    assert "Library/Application Support" in str(p)
+    # Path-agnostic: on Windows str(p) uses backslashes, so substring
+    # matching on "Library/Application Support" would fail even though
+    # the mocked home structure is identical.
+    assert "Library" in p.parts
+    assert "Application Support" in p.parts
 
 
 def test_ensure_user_override_creates_then_noop(
