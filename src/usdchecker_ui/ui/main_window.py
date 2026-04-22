@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from usdchecker_ui.core import editor_launcher, exporter, patterns_store
+from usdchecker_ui.core.drop_filter import first_accepted_file
 from usdchecker_ui.core.enricher import EnrichedDiagnostic, enrich
 from usdchecker_ui.ui.check_worker import CheckWorker
 from usdchecker_ui.ui.detail_panel import DetailPanel
@@ -74,6 +75,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("USDChecker UI")
         self.resize(1100, 720)
+
+        # Accept drops on the whole window, not just the DropZone widget.
+        # On Windows, Explorer -> Qt drops can land on a child that does
+        # not accept drops (tree, splitter gutter, detail panel) and fail
+        # silently rather than bubbling to the zone. Having the top-level
+        # window accept drops ensures any drop on the app is caught.
+        self.setAcceptDrops(True)
 
         self._toolbar = MainToolbar(self)
         self.addToolBar(self._toolbar)
@@ -267,6 +275,39 @@ class MainWindow(QMainWindow):
 
     def _toast(self, message: str, duration_ms: int = 3000) -> None:
         self._status.showMessage(message, duration_ms)
+
+    # ---- drop handling (window-wide fallback) -----------------------------
+    # The DropZone widget also handles drops directly on itself (with
+    # the green-border feedback). These window-level handlers catch
+    # drops anywhere else in the main window — particularly helpful on
+    # Windows where Qt does not always bubble drops from a non-accepting
+    # child widget up to a drop-accepting ancestor.
+    def _dropped_path(self, event) -> Path | None:  # noqa: ANN001 — Qt drop event
+        md = event.mimeData()
+        if not md.hasUrls():
+            return None
+        locals_ = [u.toLocalFile() for u in md.urls() if u.isLocalFile()]
+        return first_accepted_file(locals_)
+
+    def dragEnterEvent(self, event) -> None:  # noqa: N802, ANN001 — Qt API
+        if self._dropped_path(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event) -> None:  # noqa: N802, ANN001 — Qt API
+        if self._dropped_path(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event) -> None:  # noqa: N802, ANN001 — Qt API
+        path = self._dropped_path(event)
+        if path is None:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self._on_file_dropped(path)
 
     # ---- shutdown ---------------------------------------------------------
     def shutdown(self) -> None:

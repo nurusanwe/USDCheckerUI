@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
 from PySide6.QtWidgets import QLabel
 
-_ACCEPTED_EXTS = {".usd", ".usda", ".usdc", ".usdz"}
+from usdchecker_ui.core.drop_filter import first_accepted_file
 
 _PLACEHOLDER = "Drop a .usd / .usda / .usdc / .usdz file here"
 
@@ -55,17 +55,14 @@ class DropZone(QLabel):
         self.style().unpolish(self)
         self.style().polish(self)
 
-    def _first_valid(self, event: QDragEnterEvent | QDropEvent) -> Path | None:
+    def _first_valid(
+        self, event: QDragEnterEvent | QDragMoveEvent | QDropEvent
+    ) -> Path | None:
         md = event.mimeData()
         if not md.hasUrls():
             return None
-        for url in md.urls():
-            if not url.isLocalFile():
-                continue
-            path = Path(url.toLocalFile())
-            if path.suffix.lower() in _ACCEPTED_EXTS:
-                return path
-        return None
+        locals_ = [u.toLocalFile() for u in md.urls() if u.isLocalFile()]
+        return first_accepted_file(locals_)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if self._first_valid(event):
@@ -76,6 +73,15 @@ class DropZone(QLabel):
         else:
             event.ignore()
             self.setToolTip("Unsupported format")
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
+        # Windows Qt requires an explicit accept during move, otherwise
+        # the drop phase refuses the payload even if dragEnter accepted.
+        # macOS tolerates the default, so this is belt-and-braces there.
+        if self._first_valid(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def dragLeaveEvent(self, event) -> None:  # noqa: D401, ANN001
         self.setProperty("drag", False)
