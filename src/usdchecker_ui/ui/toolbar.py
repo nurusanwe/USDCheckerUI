@@ -13,6 +13,7 @@ class MainToolbar(QToolBar):
     editorRequested = Signal()
     editPatternsRequested = Signal()
     reloadPatternsRequested = Signal()
+    editKnownShadersRequested = Signal()
     editShaderPluginsRequested = Signal()
 
     def __init__(self, parent=None):
@@ -49,11 +50,18 @@ class MainToolbar(QToolBar):
         edit_action.triggered.connect(self.editPatternsRequested)
         reload_action = QAction("Reload patterns", settings_menu)
         reload_action.triggered.connect(self.reloadPatternsRequested)
-        shader_plugins_action = QAction("Shader plugin paths…", settings_menu)
+        known_shaders_action = QAction(
+            "Additional shader definitions…", settings_menu
+        )
+        known_shaders_action.triggered.connect(self.editKnownShadersRequested)
+        shader_plugins_action = QAction(
+            "Shader plugin paths… (advanced)", settings_menu
+        )
         shader_plugins_action.triggered.connect(self.editShaderPluginsRequested)
         settings_menu.addAction(edit_action)
         settings_menu.addAction(reload_action)
         settings_menu.addSeparator()
+        settings_menu.addAction(known_shaders_action)
         settings_menu.addAction(shader_plugins_action)
         settings_btn.setMenu(settings_menu)
         self.addWidget(settings_btn)

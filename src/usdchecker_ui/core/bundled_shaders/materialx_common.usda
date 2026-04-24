@@ -1,0 +1,64 @@
+#usda 1.0
+(
+    doc = """
+    Common MaterialX PBR surface shader identifiers bundled with
+    USDChecker UI so their IDs are recognised by the known-shader
+    filter even when usd-core is built without MaterialX support
+    (the default PyPI wheel).
+
+    Scope: canonical surface-terminal nodes only. Texture readers
+    (ND_image_*), converters (ND_convert_*), and the rest of the
+    MaterialX stdlib are not included — they are a much longer
+    list and are rarely the source of `has invalid shader node`
+    noise in validation, so we prefer to keep the bundled set
+    small and curated rather than shipping a thousand identifiers
+    whose names we cannot independently verify.
+
+    Users who work with a broader MaterialX set can add their
+    own .usda file via Settings -> Additional shader definitions,
+    which unions into the same suppression set at runtime.
+
+    Source: MaterialX PBR library documentation
+    (https://github.com/AcademySoftwareFoundation/MaterialX).
+    """
+)
+
+def Shader "ND_standard_surface_surfaceshader" (
+    sdrMetadata = {
+        token label = "MaterialX Standard Surface"
+    }
+)
+{
+    uniform token info:id = "ND_standard_surface_surfaceshader"
+    uniform token info:implementationSource = "id"
+}
+
+def Shader "ND_gltf_pbr_surfaceshader" (
+    sdrMetadata = {
+        token label = "MaterialX glTF PBR"
+    }
+)
+{
+    uniform token info:id = "ND_gltf_pbr_surfaceshader"
+    uniform token info:implementationSource = "id"
+}
+
+def Shader "ND_UsdPreviewSurface_surfaceshader" (
+    sdrMetadata = {
+        token label = "MaterialX UsdPreviewSurface bridge"
+    }
+)
+{
+    uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+    uniform token info:implementationSource = "id"
+}
+
+def Shader "ND_open_pbr_surface_surfaceshader" (
+    sdrMetadata = {
+        token label = "MaterialX OpenPBR Surface"
+    }
+)
+{
+    uniform token info:id = "ND_open_pbr_surface_surfaceshader"
+    uniform token info:implementationSource = "id"
+}

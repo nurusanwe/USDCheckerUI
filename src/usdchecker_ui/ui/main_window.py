@@ -149,6 +149,7 @@ class MainWindow(QMainWindow):
         self._toolbar.editorRequested.connect(self._on_editor_requested)
         self._toolbar.editPatternsRequested.connect(self._on_edit_patterns)
         self._toolbar.reloadPatternsRequested.connect(self._on_reload_patterns)
+        self._toolbar.editKnownShadersRequested.connect(self._on_edit_known_shaders)
         self._toolbar.editShaderPluginsRequested.connect(self._on_edit_shader_plugins)
         self._filter_bar.textChanged.connect(self._tree.proxy().set_text)
         self._filter_bar.severitiesChanged.connect(self._tree.proxy().set_severities)
@@ -308,6 +309,13 @@ class MainWindow(QMainWindow):
         # file if any — new Sdr definitions only influence diagnostics
         # produced by a fresh usdchecker pass.
         dialog.pathsChanged.connect(self._revalidate_current_file)
+        dialog.exec()
+
+    def _on_edit_known_shaders(self) -> None:
+        from usdchecker_ui.ui.known_shaders_dialog import KnownShadersDialog
+
+        dialog = KnownShadersDialog(self)
+        dialog.sourcesChanged.connect(self._revalidate_current_file)
         dialog.exec()
 
     def _revalidate_current_file(self) -> None:

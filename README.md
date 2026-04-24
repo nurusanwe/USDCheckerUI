@@ -271,6 +271,39 @@ issue).
 
 ---
 
+## Additional shader definitions (user-extensible)
+
+If you hit the `Shader identifier not found in Sdr registry` error on
+a shader family that is NOT already covered out of the box (Houdini
+Karma shaders, Pixar RenderMan, an in-house studio renderer, …), you
+can extend the known-shader set without rebuilding the app:
+
+1. Find a `.usda` file that declares the shader identifiers your
+   pipeline uses. This is typically shipped as part of the renderer
+   install (`$HFS/houdini/.../*.usda`, `$RMANTREE/.../*.usda`, an
+   internal studio .usda, etc.). It must contain one or more
+   `def Shader "…" { info:id = "…" }` prims.
+2. **Settings → Additional shader definitions…** → **Add .usda…** →
+   pick the file.
+3. The tool parses the file, extracts every `info:id` it declares,
+   and unions those identifiers into the bundled set. The current
+   file is re-validated automatically; matching "invalid shader node"
+   diagnostics are suppressed on the next pass.
+
+Under the hood this is the same mechanism that handles
+`AdobeStandardMaterial_*` and the bundled MaterialX surface shaders —
+you are extending the same suppression set. The user config is
+persisted to:
+
+- macOS   `~/Library/Application Support/USDCheckerUI/known_shader_sources.yaml`
+- Windows `%APPDATA%\USDCheckerUI\known_shader_sources.yaml`
+
+There is no public centralised registry of renderer shader
+definitions; each vendor ships theirs with their install. Ask your
+pipeline team where to find them if you are not sure.
+
+---
+
 ## Built-in shader identifiers (zero-config)
 
 USDChecker UI ships with a bundled `shader_definitions.usda` that
