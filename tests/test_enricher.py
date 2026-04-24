@@ -181,6 +181,45 @@ def test_normal_map_missing_scale_bias_hits_scale_card() -> None:
     assert "scale" in enriched.title.lower()
 
 
+def test_shader_invalid_node_acknowledges_plugin_false_positive() -> None:
+    """The 'Shader <...> has invalid shader node' diagnostic fires on
+    renderer-specific shader identifiers (Adobe ASM, Houdini Karma,
+    Renderman Pxr*) whenever the matching Sdr plugin is not installed
+    in the validator environment — which is always the case in a
+    pure usd-core PyInstaller bundle. The card must flag this as a
+    possible false positive AND name the common culprits, so a
+    tester looking at the detail panel does not panic over valid
+    pipeline shaders.
+    """
+    patterns = load_merged()
+    d = Diagnostic(
+        rule="ShaderPropertyTypeConformanceChecker",
+        severity="error",
+        message="Shader </Asset/Looks/Material/ASM_Metal> has invalid shader node.",
+    )
+    enriched = enrich(d, patterns)
+
+    # Title stays stable so prior references to the card keep working.
+    assert enriched.title is not None
+    assert "Sdr registry" in enriched.title
+
+    body = " ".join(filter(None, [enriched.explanation, enriched.suggestion]))
+    low = body.lower()
+
+    # The card must surface the "plugin not installed" dimension, not
+    # just "fix your USD".
+    assert "plugin" in low, body
+    assert "false positive" in low or "not installed" in low, body
+
+    # At least one concrete renderer-specific culprit is named, so the
+    # reader can self-identify their situation.
+    assert any(name in body for name in ("ASM", "hdEclair", "Karma", "Renderman")), body
+
+    # And the "really-wrong" branch is still there — we did not drop the
+    # guidance for the case where info:id is a genuine typo.
+    assert "UsdPreviewSurface" in body
+
+
 # --- to_dict schema (unchanged) --------------------------------------------
 
 def test_to_dict_schema_matches_ac12() -> None:

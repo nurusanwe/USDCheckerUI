@@ -410,14 +410,41 @@
   match: "has invalid shader node"
   title: "Shader identifier not found in Sdr registry"
   explanation: |
-    The Shader's `info:id` points to an identifier that the Sdr
-    (Shader Definition Registry) does not know about. No Sdr shader
-    node is loaded for that identifier, so property types cannot
-    be validated.
+    The Shader's `info:id` is an identifier the Sdr (Shader
+    Definition Registry) does not know about in THIS validation
+    environment. Two situations produce this diagnostic, and USD
+    cannot tell them apart — from Sdr's point of view, an
+    un-registered identifier is an un-registered identifier:
+
+    1. The shader is genuinely invalid — a typo in `info:id`, a
+       custom shader that was never registered, or a forgotten
+       migration from an old shader name.
+
+    2. The shader is valid for your pipeline, but the Sdr plugin
+       that defines it is not installed in the validator's Python
+       environment. USDChecker UI only bundles `usd-core`, so any
+       renderer-specific or studio-specific shader types surface
+       as "unknown". Common culprits:
+
+         - `ASM_*` / Adobe Standard Material — needs the
+           `hdEclair` plugin (Adobe Eclair Studio) whose
+           shader_definitions.usda registers the ASM_* family.
+         - Houdini Karma, Renderman `Pxr*`, in-house studio
+           shaders — need their respective Sdr plugin to be
+           registered before the stage is composed.
   suggestion: |
-    Either set `info:id` to a known node identifier (e.g.
-    `UsdPreviewSurface`, `UsdUVTexture`), or register the custom
-    shader in the Sdr plugin system before loading the stage.
+    If the identifier is correct AND the matching Sdr plugin would
+    be present in the runtime/render environment where the USD is
+    actually consumed, this diagnostic is a false positive for this
+    validation pass — safe to ignore until USDChecker UI is able to
+    load external shader_definitions.usda files (planned).
+
+    If the identifier is genuinely wrong:
+      - Check the spelling of `info:id` against the shader's
+        registered identifier in its plugin.
+      - Or switch to a core shader type that is always known:
+        UsdPreviewSurface, UsdUVTexture, UsdTransform2d,
+        UsdPrimvarReader_*, or any MaterialX `ND_*` node.
 
 - rule: ShaderPropertyTypeConformanceChecker
   match: "Incorrect type for"
