@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -81,14 +81,33 @@ class ShaderPluginsDialog(QDialog):
         close_box.rejected.connect(self.accept)
         close_box.accepted.connect(self.accept)
 
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(
-            "Additional plugInfo.json paths loaded into the Sdr registry "
-            "so renderer-specific shader types are recognised during "
-            "validation (e.g. renderer-specific or studio-specific shaders).",
+        intro = QLabel(
+            "<b>Advanced — you most likely do not need this dialog.</b><br><br>"
+            "Adobe Standard Material shaders are already recognised out of "
+            "the box (see Settings menu for details). This dialog is for "
+            "<i>other</i> renderer-specific shader types that show up as "
+            "&ldquo;Shader identifier not found in Sdr registry&rdquo; — "
+            "Houdini Karma, Pixar RenderMan, in-house studio shaders, "
+            "etc. USDChecker UI will load the Sdr plugin metadata you "
+            "point it at so the validator stops flagging those shaders.<br><br>"
+            "<b>What to pick:</b> a <b>folder</b> that contains a file named "
+            "<code>plugInfo.json</code>. This folder is created on your "
+            "machine when you install a renderer or USD plugin. Common "
+            "locations:"
+            "<ul>"
+            "<li>Houdini Karma: <code>$HFS/houdini/dso/usd_plugins/&lt;plugin&gt;</code></li>"
+            "<li>RenderMan: <code>$RMANTREE/lib/plugins/usd/&lt;plugin&gt;</code></li>"
+            "<li>In-house studio plugin: ask your pipeline team.</li>"
+            "</ul>"
+            "If you are not sure, it is safe to close this dialog and "
+            "ignore the menu — the tool will keep working.",
             self,
-        ))
-        layout.itemAt(0).widget().setWordWrap(True)
+        )
+        intro.setWordWrap(True)
+        intro.setTextFormat(Qt.TextFormat.RichText)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(intro)
         layout.addWidget(self._list, 1)
         layout.addLayout(button_row)
         layout.addWidget(self._caveat)
