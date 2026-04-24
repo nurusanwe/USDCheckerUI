@@ -131,6 +131,7 @@ class MainWindow(QMainWindow):
         self._toolbar.editorRequested.connect(self._on_editor_requested)
         self._toolbar.editPatternsRequested.connect(self._on_edit_patterns)
         self._toolbar.reloadPatternsRequested.connect(self._on_reload_patterns)
+        self._toolbar.editShaderPluginsRequested.connect(self._on_edit_shader_plugins)
         self._filter_bar.textChanged.connect(self._tree.proxy().set_text)
         self._filter_bar.severitiesChanged.connect(self._tree.proxy().set_severities)
         self._filter_bar.ruleChanged.connect(self._tree.proxy().set_rules)
@@ -258,6 +259,22 @@ class MainWindow(QMainWindow):
         self._tree.populate(self._diagnostics)
         self._filter_bar.set_available_rules(self._tree.known_rules())
         self._toast("Patterns reloaded.")
+
+    def _on_edit_shader_plugins(self) -> None:
+        from usdchecker_ui.ui.shader_plugins_dialog import ShaderPluginsDialog
+
+        dialog = ShaderPluginsDialog(self)
+        # When a path is successfully registered, re-validate the current
+        # file if any — new Sdr definitions only influence diagnostics
+        # produced by a fresh usdchecker pass.
+        dialog.pathsChanged.connect(self._revalidate_current_file)
+        dialog.exec()
+
+    def _revalidate_current_file(self) -> None:
+        if self._current_file is None or self._busy:
+            return
+        self._toast("Re-validating with the updated shader plugins…")
+        self._on_file_dropped(self._current_file)
 
     def _reset_filters(self) -> None:
         proxy = self._tree.proxy()

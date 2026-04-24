@@ -237,6 +237,47 @@ To add a new rule, append to the user file:
 
 ---
 
+## Shader plugin paths (renderer-specific shader definitions)
+
+By default, USDChecker UI only knows about the shader types that ship
+in the `usd-core` wheel — `UsdPreviewSurface`, `UsdUVTexture`,
+`UsdTransform2d`, `UsdPrimvarReader_*`, and the MaterialX `ND_*`
+library. Anything else (Adobe ASM, Houdini Karma, Renderman `Pxr*`,
+in-house studio shaders) surfaces as **"Shader identifier not found
+in Sdr registry"**, even though the shader is perfectly valid in the
+pipeline that consumes the USD.
+
+To make those shader types known during validation, register the
+plugin directory that defines them via **Settings → Shader plugin
+paths…**:
+
+- **Add directory…** — pick a directory that contains a
+  `plugInfo.json` directly (typical plugin layout).
+- **Add plugInfo.json…** — pick the JSON file itself if it lives
+  somewhere unusual.
+- **Remove** — drops the path from the config. Note: pxr has no
+  un-registration API, so removing only takes full effect on the
+  next app launch.
+
+The path list is persisted to:
+
+- macOS   `~/Library/Application Support/USDCheckerUI/shader_plugins.yaml`
+- Windows `%APPDATA%\USDCheckerUI\shader_plugins.yaml`
+
+After adding a path, USDChecker UI re-validates the currently loaded
+file automatically — the Sdr card should flip from "unknown" to a
+clean diagnostic (or disappear entirely if the shader was the only
+issue).
+
+### Adobe Eclair (ASM_*)
+
+Point **Add directory…** at the plugin directory that ships
+`shader_definitions.usda`. The exact location depends on how you
+installed the `hdEclair` plugin on your machine; ask the Eclair team
+if you are not sure.
+
+---
+
 ## Manual smoke test (after build)
 
 1. Launch the app (`.app` on macOS / `.exe` on Windows). Main window

@@ -52,8 +52,9 @@ _SCHEMA_MODULES = (
 
 
 def warm() -> None:
-    """Import pxr base + schema modules and instantiate a disposable
-    ComplianceChecker (which triggers UsdSchemaRegistry singleton init)."""
+    """Import pxr base + schema modules, register user-configured shader
+    plugins, and instantiate a disposable ComplianceChecker (which
+    triggers UsdSchemaRegistry singleton init)."""
     # Base modules first — Tf/Plug/Sdf must be live before any schema
     # submodule registers into them.
     from pxr import Ar, Sdf, Tf, Usd, UsdUtils  # noqa: F401
@@ -62,6 +63,20 @@ def warm() -> None:
     # before UsdSchemaRegistry starts walking plugInfos.
     for name in _SCHEMA_MODULES:
         importlib.import_module(f"pxr.{name}")
+
+    # User-configured Sdr plugin paths (Adobe ASM / hdEclair, Houdini
+    # Karma, custom studio shaders, ...). Each path is tried independently
+    # so one broken plugInfo does not block the others. Failures are
+    # warned about but never fatal — the app still launches.
+    import warnings as _warnings
+
+    from usdchecker_ui.core import shader_plugins
+    for result in shader_plugins.register_configured():
+        if not result.ok:
+            _warnings.warn(
+                f"Could not register shader plugin at {result.path}: {result.error}",
+                stacklevel=1,
+            )
 
     # Finally, touch the ComplianceChecker. This is what drives
     # UsdSchemaRegistry singleton initialization; if any TfType were
