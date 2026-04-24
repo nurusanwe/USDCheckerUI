@@ -96,9 +96,9 @@ def test_filter_suppresses_known_shader_invalid_node(tmp_path: Path) -> None:
         message="Shader </World/Mat/Look> has invalid shader node.",
         prim_path="/World/Mat/Look",
     )
-    kept, count = _filter_known_shader_diagnostics([diag], usd)
+    kept, suppressed_list = _filter_known_shader_diagnostics([diag], usd)
     assert kept == []
-    assert count == 1
+    assert suppressed_list == [diag]
 
 
 def test_filter_keeps_unknown_shader_id(tmp_path: Path) -> None:
@@ -110,9 +110,9 @@ def test_filter_keeps_unknown_shader_id(tmp_path: Path) -> None:
         message="Shader </World/Mat/Look> has invalid shader node.",
         prim_path="/World/Mat/Look",
     )
-    kept, count = _filter_known_shader_diagnostics([diag], usd)
+    kept, suppressed_list = _filter_known_shader_diagnostics([diag], usd)
     assert kept == [diag]
-    assert count == 0
+    assert suppressed_list == []
 
 
 def test_filter_keeps_other_messages_on_known_shader_prim(tmp_path: Path) -> None:
@@ -135,11 +135,11 @@ def test_filter_keeps_other_messages_on_known_shader_prim(tmp_path: Path) -> Non
         message="Shader </World/Mat/Look> has no sourceType.",
         prim_path="/World/Mat/Look",
     )
-    kept, count = _filter_known_shader_diagnostics(
+    kept, suppressed_list = _filter_known_shader_diagnostics(
         [incorrect_type, no_sourcetype], usd
     )
     assert kept == [incorrect_type, no_sourcetype]
-    assert count == 0
+    assert suppressed_list == []
 
 
 def test_filter_keeps_other_rules(tmp_path: Path) -> None:
@@ -154,16 +154,16 @@ def test_filter_keeps_other_rules(tmp_path: Path) -> None:
         message="something has invalid shader node wording",
         prim_path="/World/Mat/Look",
     )
-    kept, count = _filter_known_shader_diagnostics([normal_map], usd)
+    kept, suppressed_list = _filter_known_shader_diagnostics([normal_map], usd)
     assert kept == [normal_map]
-    assert count == 0
+    assert suppressed_list == []
 
 
 def test_filter_no_op_on_empty_input(tmp_path: Path) -> None:
     usd = _write_usda(tmp_path / "known.usda", "AdobeStandardMaterial_4_0")
-    kept, count = _filter_known_shader_diagnostics([], usd)
+    kept, suppressed_list = _filter_known_shader_diagnostics([], usd)
     assert kept == []
-    assert count == 0
+    assert suppressed_list == []
 
 
 def test_filter_mix_of_suppressed_and_kept(tmp_path: Path) -> None:
@@ -203,22 +203,24 @@ def test_filter_mix_of_suppressed_and_kept(tmp_path: Path) -> None:
             prim_path="/World/MatUnknown/Look",
         ),
     ]
-    kept, count = _filter_known_shader_diagnostics(diags, usd)
-    assert count == 1
+    kept, suppressed_list = _filter_known_shader_diagnostics(diags, usd)
+    assert len(suppressed_list) == 1
+    assert suppressed_list[0].prim_path == "/World/MatKnown/Look"
     assert len(kept) == 1
     assert kept[0].prim_path == "/World/MatUnknown/Look"
 
 
-def test_check_with_result_reports_suppressed_count(tmp_path: Path) -> None:
+def test_check_with_result_reports_suppressed_list(tmp_path: Path) -> None:
     """End-to-end: feed ComplianceChecker a known-ID Shader prim and
-    verify check_with_result returns a non-zero suppressed count while
-    the resulting diagnostics list is clean."""
+    verify check_with_result returns both a populated suppressed list
+    AND a clean main diagnostics list."""
     _ = pytest.importorskip("pxr.UsdShade")
     usd = _write_usda(tmp_path / "e2e.usda", "AdobeStandardMaterial_4_0")
     result = check_with_result(usd)
     # The raw ComplianceChecker would emit at least one
     # ShaderPropertyTypeConformanceChecker / "has invalid shader node"
-    # diagnostic for this prim; after suppression it should be gone.
+    # diagnostic for this prim; after suppression it should be gone
+    # from .diagnostics and present in .suppressed_known_shader.
     offending = [
         d for d in result.diagnostics
         if d.rule == "ShaderPropertyTypeConformanceChecker"
@@ -227,4 +229,12 @@ def test_check_with_result_reports_suppressed_count(tmp_path: Path) -> None:
     assert offending == [], (
         f"known-shader 'invalid shader node' leaked through: {offending}"
     )
-    assert result.suppressed_known_shader_count >= 1, result
+    assert len(result.suppressed_known_shader) >= 1, result
+    # Back-compat accessor still works.
+    assert result.suppressed_known_shader_count == len(result.suppressed_known_shader)
+    # Each suppressed entry carries the full raw diagnostic — the
+    # audit dialog relies on these fields being populated.
+    for diag in result.suppressed_known_shader:
+        assert diag.rule == "ShaderPropertyTypeConformanceChecker"
+        assert "has invalid shader node" in diag.message
+        assert diag.prim_path

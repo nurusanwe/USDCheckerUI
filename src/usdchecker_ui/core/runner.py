@@ -42,14 +42,19 @@ _SHADER_CONFORMANCE_RULE = "ShaderPropertyTypeConformanceChecker"
 class CheckResult:
     """Outcome of a validation run.
 
-    `diagnostics` is the list the UI renders. `suppressed_known_shader_count`
-    is how many "has invalid shader node" diagnostics were filtered out
-    because the Shader prim carried a `info:id` listed in the bundled
-    shader definitions — surfaced in the status bar so a user looking
-    for a vanished warning can see something actually happened.
+    `diagnostics` is the list the UI renders. `suppressed_known_shader`
+    is the list of diagnostics that were filtered out because their
+    Shader prim carried an `info:id` listed in the bundled known
+    shader definitions. We return the list itself (not just a count)
+    so the UI can offer an "audit what was suppressed" affordance —
+    otherwise a silent drop makes the filter feel like a black box.
     """
     diagnostics: list[Diagnostic] = field(default_factory=list)
-    suppressed_known_shader_count: int = 0
+    suppressed_known_shader: list[Diagnostic] = field(default_factory=list)
+
+    @property
+    def suppressed_known_shader_count(self) -> int:
+        return len(self.suppressed_known_shader)
 
 
 class RunnerError(Exception):
@@ -124,14 +129,15 @@ def check_with_result(file_path: Path) -> CheckResult:
     # info:id is a bundled known identifier. Re-open the stage once —
     # pxr caches this, so the cost is effectively the cache lookup.
     kept, suppressed = _filter_known_shader_diagnostics(raw_diagnostics, path)
-    return CheckResult(diagnostics=kept, suppressed_known_shader_count=suppressed)
+    return CheckResult(diagnostics=kept, suppressed_known_shader=suppressed)
 
 
 def _filter_known_shader_diagnostics(
     diagnostics: list[Diagnostic], usd_path: Path
-) -> tuple[list[Diagnostic], int]:
+) -> tuple[list[Diagnostic], list[Diagnostic]]:
     """Drop the shader-conformance "has invalid shader node" diagnostics
-    whose prim carries a bundled-known `info:id`. Returns (kept, count).
+    whose prim carries a bundled-known `info:id`. Returns
+    (kept, suppressed_list).
 
     Everything else passes through untouched — crucially, OTHER messages
     from the same rule on the same prim (Incorrect type, invalid
@@ -145,12 +151,12 @@ def _filter_known_shader_diagnostics(
         and d.prim_path
     ]
     if not candidates:
-        return diagnostics, 0
+        return diagnostics, []
 
     from usdchecker_ui.core import known_shaders
     known = known_shaders.known_shader_ids()
     if not known:
-        return diagnostics, 0
+        return diagnostics, []
 
     # Open the stage once. Failures here shouldn't kill suppression —
     # just fall back to no-op (keep everything), since the user still
@@ -159,9 +165,9 @@ def _filter_known_shader_diagnostics(
         from pxr import Usd, UsdShade
         stage = Usd.Stage.Open(str(usd_path))
     except Exception:  # noqa: BLE001 — any pxr/file error falls back to no-op
-        return diagnostics, 0
+        return diagnostics, []
     if stage is None:
-        return diagnostics, 0
+        return diagnostics, []
 
     suppressible_paths: set[str] = set()
     for diag in candidates:
@@ -175,17 +181,17 @@ def _filter_known_shader_diagnostics(
             suppressible_paths.add(diag.prim_path)
 
     if not suppressible_paths:
-        return diagnostics, 0
+        return diagnostics, []
 
     kept: list[Diagnostic] = []
-    suppressed = 0
+    suppressed: list[Diagnostic] = []
     for diag in diagnostics:
         if (
             diag.rule == _SHADER_CONFORMANCE_RULE
             and _INVALID_SHADER_NODE_MARKER in diag.message
             and diag.prim_path in suppressible_paths
         ):
-            suppressed += 1
+            suppressed.append(diag)
             continue
         kept.append(diag)
     return kept, suppressed

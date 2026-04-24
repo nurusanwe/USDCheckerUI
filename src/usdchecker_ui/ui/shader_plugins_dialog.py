@@ -70,7 +70,12 @@ class ShaderPluginsDialog(QDialog):
             self,
         )
         self._caveat.setWordWrap(True)
-        self._caveat.setStyleSheet("color: palette(mid); font-size: 11pt;")
+        # Italic only — inherits the default text colour so the contrast
+        # stays readable on both light and dark palettes. (Previous
+        # `palette(mid)` rendered as dark-grey-on-light-grey on macOS.)
+        font = self._caveat.font()
+        font.setItalic(True)
+        self._caveat.setFont(font)
 
         close_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         close_box.rejected.connect(self.accept)

@@ -18,11 +18,11 @@ from usdchecker_ui.core.runner import RunnerError, check_with_result
 
 
 class CheckWorker(QObject):
-    # enriched diagnostics, duration seconds, count of suppressed
-    # known-shader diagnostics (surface in the status bar so the user
-    # sees something actually happened rather than warnings "vanishing"
-    # silently).
-    finished = Signal(list, float, int)
+    # enriched diagnostics kept for display, duration seconds, list of
+    # raw Diagnostic objects suppressed by the known-shader filter.
+    # The latter is what the UI shows in the audit dialog — passing the
+    # list (not just a count) keeps the filter transparent.
+    finished = Signal(list, float, list)
     failed = Signal(str, str)  # code, message
 
     @Slot(str)
@@ -51,4 +51,4 @@ class CheckWorker(QObject):
             # Do NOT return — the diagnostics themselves are still valid.
         enriched = [enrich(d, patterns) for d in result.diagnostics]
         duration = time.monotonic() - started
-        self.finished.emit(enriched, duration, result.suppressed_known_shader_count)
+        self.finished.emit(enriched, duration, list(result.suppressed_known_shader))

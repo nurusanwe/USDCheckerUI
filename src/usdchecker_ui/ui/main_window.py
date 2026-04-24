@@ -13,11 +13,13 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QSplitter,
     QStatusBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from usdchecker_ui.core import editor_launcher, exporter, patterns_store
+from usdchecker_ui.core.diagnostic import Diagnostic
 from usdchecker_ui.core.drop_filter import first_accepted_file
 from usdchecker_ui.core.enricher import EnrichedDiagnostic, enrich
 from usdchecker_ui.ui.check_worker import CheckWorker
@@ -109,6 +111,22 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self._status)
         self._status.showMessage("Ready — drop a USD file.")
 
+        # Permanent clickable indicator on the right side of the status
+        # bar. Hidden until at least one known-shader diagnostic has been
+        # suppressed on the current validation pass. Clicking opens the
+        # audit dialog so the filter stays transparent.
+        self._suppressed_btn = QToolButton()
+        self._suppressed_btn.setAutoRaise(True)
+        self._suppressed_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._suppressed_btn.setToolTip(
+            "Click to see what the known-shader filter suppressed on the "
+            "last validation pass."
+        )
+        self._suppressed_btn.clicked.connect(self._on_show_suppressed)
+        self._suppressed_btn.hide()
+        self._status.addPermanentWidget(self._suppressed_btn)
+        self._suppressed_diagnostics: list[Diagnostic] = []
+
         # Worker thread.
         self._thread = QThread(self)
         self._worker = CheckWorker()
@@ -166,7 +184,7 @@ class MainWindow(QMainWindow):
         self,
         diagnostics: list[EnrichedDiagnostic],
         duration: float,
-        suppressed_known_shader_count: int = 0,
+        suppressed_known_shader: list[Diagnostic] | None = None,
     ) -> None:
         self._busy = False
         self._diagnostics = diagnostics
@@ -176,19 +194,28 @@ class MainWindow(QMainWindow):
         self._update_editor_button(self._current_file)
         self._toolbar.set_export_enabled(bool(diagnostics))
 
-        suppressed_tail = (
-            f" — {suppressed_known_shader_count} known-shader warning(s) suppressed"
-            if suppressed_known_shader_count
-            else ""
-        )
-        if not diagnostics:
-            self._status.showMessage(
-                f"0 diagnostics — file is clean.{suppressed_tail}"
+        self._suppressed_diagnostics = list(suppressed_known_shader or [])
+        n_suppressed = len(self._suppressed_diagnostics)
+        if n_suppressed:
+            self._suppressed_btn.setText(
+                f"🔕  {n_suppressed} known-shader warning(s) suppressed — click to view"
             )
+            self._suppressed_btn.show()
+        else:
+            self._suppressed_btn.hide()
+
+        if not diagnostics:
+            self._status.showMessage("0 diagnostics — file is clean.")
         else:
             self._status.showMessage(
-                f"{len(diagnostics)} diagnostic(s) in {duration:.2f}s.{suppressed_tail}"
+                f"{len(diagnostics)} diagnostic(s) in {duration:.2f}s."
             )
+
+    def _on_show_suppressed(self) -> None:
+        if not self._suppressed_diagnostics:
+            return
+        from usdchecker_ui.ui.suppressed_dialog import SuppressedDialog
+        SuppressedDialog(self._suppressed_diagnostics, self).exec()
 
     def _on_failed(self, code: str, message: str) -> None:
         self._busy = False
