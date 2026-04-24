@@ -162,7 +162,12 @@ class MainWindow(QMainWindow):
         if path_str:
             self._on_file_dropped(Path(path_str))
 
-    def _on_finished(self, diagnostics: list[EnrichedDiagnostic], duration: float) -> None:
+    def _on_finished(
+        self,
+        diagnostics: list[EnrichedDiagnostic],
+        duration: float,
+        suppressed_known_shader_count: int = 0,
+    ) -> None:
         self._busy = False
         self._diagnostics = diagnostics
         self._last_duration = duration
@@ -170,11 +175,19 @@ class MainWindow(QMainWindow):
         self._filter_bar.set_available_rules(self._tree.known_rules())
         self._update_editor_button(self._current_file)
         self._toolbar.set_export_enabled(bool(diagnostics))
+
+        suppressed_tail = (
+            f" — {suppressed_known_shader_count} known-shader warning(s) suppressed"
+            if suppressed_known_shader_count
+            else ""
+        )
         if not diagnostics:
-            self._status.showMessage("0 diagnostics — file is clean.")
+            self._status.showMessage(
+                f"0 diagnostics — file is clean.{suppressed_tail}"
+            )
         else:
             self._status.showMessage(
-                f"{len(diagnostics)} diagnostic(s) in {duration:.2f}s."
+                f"{len(diagnostics)} diagnostic(s) in {duration:.2f}s.{suppressed_tail}"
             )
 
     def _on_failed(self, code: str, message: str) -> None:

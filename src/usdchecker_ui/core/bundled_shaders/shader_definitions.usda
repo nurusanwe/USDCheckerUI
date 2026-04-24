@@ -1,0 +1,892 @@
+#usda 1.0
+
+
+def Shader "AdobeStandardMaterial_4_0" (
+    sdrMetadata = {
+        token label = "Adobe Standard Material"
+        token help = """The Adobe Standard Material (ASM) is a material model, designed to be the common interface for materials used by
+        Adobe apps and services for physically-based rendering (PBR).
+        """
+    }
+)
+{
+    # We rely on `UsdShadeNodeDefAPI` API schema to specify this Shader Node Definition (aka Sdr Node)
+    uniform token info:id = "AdobeStandardMaterial_4_0"
+    uniform token info:implementationSource = "id"
+
+    token outputs:surface (
+        sdrMetadata = {
+            string renderType = "terminal surface"
+        }
+    )
+
+    ### SURFACE ###
+    # Surface BSDFs describe the specular reflectivity and transmissivity of the surface. Where it is practical, all
+    # implementations should be energy-conserving and reciprocal.
+
+    # Supported surfaces are divided into two subcategories which are weighted according to metallicity: Metals
+    # (conductors) and dielectrics (insulators). (Semiconductors have different optical properties and are not supported
+    # directly in this model.)
+
+    # Metals have a complex index of refraction (IOR) that varies by wavelength, leading to a color shift that varies over
+    # the range of angles of incidence. In order to achieve an optimal balance of accuracy for real metals and artdirectability, 
+    # ASM uses a reparameterized version of the “F82” model presented in [Hoffman2019]. Please see the technical documentation for more details.
+
+    # Dielectric surfaces exhibit Fresnel-modulated reflection and transmission dependent on IOR. When dispersion is
+    # used, this IOR varies based on the wavelength of the light. In real-time renderers, a Schlick approximation may be
+    # employed.
+
+    # Reflectance should be based on a microfacet-based specularity model capable of unimodal anisotropic roughness.
+    # Where there is high roughness, effort should be made to simulate multiple-scattering effects. This not only avoids
+    # darkening of things like rough glass, but also avoids darkening of subsurface scattering, since subsurface scattering is
+    # volumetric scattering that happens behind a transparent dielectric interface (SSS paths pass through the surface
+    # twice).
+
+    # We provide an artistic option for tinting the specular reflection for dielectric materials, as true Fresnel specularity is
+    # colorless. This also allows a way to easily convert specular–gloss materials to this model.
+    # The diffuse BRDF scatters the remainder of light that does not reflect or transmit according to the specular dielectric
+    # lobe.
+
+    color3f inputs:baseColor = (0.5, 0.5, 0.5) (
+        connectability = "full"
+        customData = {
+            string apiName = "baseColor"
+        }
+        sdrMetadata = {
+            uint uiOrder = 0
+            token label = "Base Color"
+            token help = "The ideal color at normal incidence of diffuse reflection for dielectrics and metallic specular reflection."
+            token page = "Surface"
+            token usage = "baseColor"
+        }
+    )
+
+    float inputs:roughness = 0.3 (
+        connectability = "full"
+        customData = {
+            string apiName = "roughness"
+        }
+        sdrMetadata = {
+            uint uiOrder = 1
+            token label = "Roughness"
+            token help = "Roughness of the surface reflections, for dielectrics and metals."
+            token page = "Surface"
+            token usage = "roughness"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:metallic = 0.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "metallic"
+        }
+        sdrMetadata = {
+            uint uiOrder = 2
+            token label = "Metallic"
+            token help = """Whether the surface behaves as a dielectric or a conductor. Only the dielectric portion of a surface may be
+            translucent. Partial values may be used to denote microscale differentiation, anodization, or oxidation."""
+            token page = "Surface"
+            token usage = "metallic"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:opacity = 1.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "opacity"
+        }
+        sdrMetadata = {
+            uint uiOrder = 3
+            token label = "Opacity"
+            token help = """Cut-through opacity, i.e., non-refractive transparency (0 = transparent, 1 = opaque). Opacity is evaluated at each
+            interface, so closed objects will appear more opaque than open ones with the same values.
+            Subsurface scattering and absorption may be used with transparent objects to create diffuse volumes with no surface.
+            """
+            token page = "Surface"
+            token usage = "opacity"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:specularLevel = 0.5 (
+        connectability = "full"
+        customData = {
+            string apiName = "specularLevel"
+        }
+        sdrMetadata = {
+            uint uiOrder = 4
+            token label = "Specular Level"
+            token help = """A texturable modifier of the specular index of refraction allowing linear variation in specular reflectivity for dielectric
+            surfaces. At the default value of 0.5, specular reflectivity at normal incidence will match that of the index of refraction
+            (specified in the translucency section). Metals are unaffected by specular level.
+            """
+            token page = "Surface"
+            token usage = "specularLevel"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    color3f inputs:specularEdgeColor = (1.0, 1.0, 1.0) (
+        connectability = "full"
+        customData = {
+            string apiName = "specularEdgeColor"
+        }
+        sdrMetadata = {
+            uint uiOrder = 5
+            token label = "Specular Edge Color"
+            token help = """Tints dielectric specular reflections and the grazing edges of metallic specular reflections. For dielectrics, this may be
+            used to dampen specularity, or in conversion from other models where specularity is directly controlled by an
+            independent parameter. For metals, this property allows art-directable variation in reflectivity toward the edges that
+            approximates the color shift caused by their complex index of refraction.
+            """
+            token page = "Surface"
+            token usage = "specularEdgeColor"
+        }
+    )
+
+    ### SURFACE DETAIL
+
+    normal3f inputs:normal (
+        connectability = "full"
+        customData = {
+            string apiName = "normal"
+        }
+        sdrMetadata = {
+            uint uiOrder = 6
+            token label = "Normal"
+            token help = """Tangent-space normal map for the surface. Normal maps are assumed to be in the OpenGL format unless alternate
+            orientations are also supported.
+            """
+            token page = "Surface"
+            token usage = "normal"
+        }
+    )
+
+    float inputs:normalScale = 1.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "normalScale"
+        }
+        sdrMetadata = {
+            uint uiOrder = 7
+            token label = "Normal Scale"
+            token help = """Multiplier of the surface normal map effect. For scales above 1, the scale is applied by scaling the z axis and renormalizing.
+            For scales below 1, the scale is applied by proportionally reducing the angle between the normal vector
+            and the z axis, which results in a smoother transition of surface detail to 0.
+            """
+            token page = "Surface"
+            token usage = "normalScale"
+            float[] range = [ 0, inf ]
+        }
+    )
+
+    bool inputs:combineNormalAndHeight = false (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "combineNormalAndHeight"
+        }
+        sdrMetadata = {
+            uint uiOrder = 8
+            token label = "Combine Normal and Height"
+            token help = """Indicates how the normal map should be interpreted when there is also a height map. If the normal map already
+            contains the detail of the height map, then it should be set to false to avoid double perturbation of the normals. If
+            the normal map curvature is intended to be applied in combination with displacement from the height map,
+            combine normal and height should be true to allow the displacement to be considered when perturbing normals
+            """
+            token page = "Surface"
+            token usage = "combineNormalAndHeight"
+        }
+    )
+
+    float inputs:height = 0.5 (
+        connectability = "full"
+        customData = {
+            string apiName = "height"
+        }
+        sdrMetadata = {
+            uint uiOrder = 9
+            token label = "Height"
+            token help = """Displacement (or bump) amount in the direction of the normal. When height is equal to the height level, there is no
+            displacement. Displacement is a scalar change in surface position toward unperturbed, blended normal surface. In
+            cases where tessellated displacement is not possible or desired, height may be implemented as a bump map.
+            """
+            token page = "Surface"
+            token usage = "height"
+        }
+    )
+
+    float inputs:heightScale = 1.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "heightScale"
+        }
+        sdrMetadata = {
+            uint uiOrder = 10
+            token label = "Height Scale"
+            token help = """ Scale of displacement or bump in scene space units. The magnitude and direction of scale is independent of the
+            value of height level.
+            """
+            token page = "Surface"
+            token usage = "heightScale"
+            float[] range = [ 0, inf ]
+        }
+    )
+
+    float inputs:heightLevel = 0.5 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "heightLevel"
+        }
+        sdrMetadata = {
+            uint uiOrder = 11
+            token label = "Height Level"
+            token help = """Value of height corresponding to no displacement (zero-level value). Height level shifts (but does not scale or flip)
+            the displacement relative to the undisplaced object’s surface. If height level is 0, all displacement is above. If height
+            level is 1, all displacement is below the surface, but it still retains the same scale and direction.
+            """
+            token page = "Surface"
+            token usage = "heightLevel"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    ### ANISOTROPY ###
+    # The anisotropy model for the Adobe Standard Material allows for an elongation of the specular highlight in a single
+    # direction to simulate coherent microscale texturing due to processes like scratches or brushing. Unlike many other
+    # models, anisotropy does not require nonzero roughness to be visible in a material, but rather complements the
+    # roughness by scaling the eccentricity of the specular highlight.
+
+    float inputs:anisotropyLevel = 0.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "anisotropyLevel"
+        }
+        sdrMetadata = {
+            uint uiOrder = 12
+            token label = "Anisotropy"
+            token help = """Specifies the degree to which the specular highlight is stretched in the direction of anisotropic rotation. May affect
+            either dielectric or metallic specularity. See the technical documentation for the formulation.
+            """
+            token page = "Surface"
+            token usage = "anisotropyLevel"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:anisotropyAngle = 0.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "anisotropyAngle"
+        }
+        sdrMetadata = {
+            uint uiOrder = 13
+            token label = "Anisotropy Angle"
+            token help = """Counterclockwise rotation of anisotropy of surface layer from the tangent direction, normalized from 0° to 360°. Note
+            that the appearance of the specular highlight is identical between 0 – 0.5 and 0.5 – 1; this allows the preservation of
+            value when converting to/from other models that support directional anisotropy.
+            """
+            token page = "Surface"
+            token usage = "anisotropyAngle"
+            token widget = "angle"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    ### EMISSION ###
+    # Emissive objects cast light into the scene. The intensity of light emitted into the scene is equal to emission multiplied
+    # by the emission color, and is independent of base color. Emissivity is assumed to be diffuse, with equal radiance in
+    # all directions above the surface. It is not scaled according to surface area.
+    # 
+    # An emissive surface will still reflect scene light regardless of its emission intensity.
+    # 
+    # For renderer implementations that do not support high dynamic range, the calculated emission should be value-limited such 
+    # that there is no saturation banding or hue shift for higher intensities.
+
+    float inputs:emissiveIntensity = 0.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "emissiveIntensity"
+        }
+        sdrMetadata = {
+            uint uiOrder = 14
+            token label = "Emission"
+            token help = "Emissive intensity multiplier, in units of radiance."
+            token page = "Emission"
+            token usage = "emissiveIntensity"
+            float[] range = [ 0, inf ]
+        }
+    )
+
+    color3f inputs:emissive = (1.0, 1.0, 1.0) (
+        connectability = "full"
+        customData = {
+            string apiName = "emissive"
+        }
+        sdrMetadata = {
+            uint uiOrder = 15
+            token label = "Emission Color"
+            token help = "Color of emitted light when emissive intensity is 1."
+            token page = "Emission"
+            token usage = "emissive"
+        }
+    )
+
+    ### SHEEN ###
+    # Sheen simulates the subtle lustrous aspect of woven surfaces like cloth and fabrics, using a retroreflective scattering
+    # model based on a distribution of scattering fibers. Fibers are assumed to be randomly oriented at the microscale
+    # according to roughness and cannot be groomed.
+    # 
+    # Sheen may be applied to dielectrics and metals. In a layered representation of the material model, it is “above” the
+    # dielectric or metal surface, and “below” the coat.
+
+    float inputs:sheenOpacity = 0.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "sheenOpacity"
+        }
+        sdrMetadata = {
+            uint uiOrder = 16
+            token label = "Sheen Opacity"
+            token help = "The amount of sheen in the material."
+            token page = "Sheen"
+            token usage = "roughness"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    color3f inputs:sheenColor = (1.0, 1.0, 1.0) (
+        connectability = "full"
+        customData = {
+            string apiName = "sheenColor"
+        }
+        sdrMetadata = {
+            uint uiOrder = 17
+            token label = "Sheen Color"
+            token help = "The color of the sheen."
+            token page = "Sheen"
+            token usage = "sheenColor"
+        }
+    )
+
+    float inputs:sheenRoughness = 0.5 (
+        connectability = "full"
+        customData = {
+            string apiName = "sheenRoughness"
+        }
+        sdrMetadata = {
+            uint uiOrder = 18
+            token label = "Sheen Roughness"
+            token help = """The size of the range of incident angles at which sheen is visible. Corresponds to the coherence of sheen fibers, or
+            the microfacet divergence from normal.
+            """
+            token page = "Sheen"
+            token usage = "sheenRoughness"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    ### INTERIOR PROPERTIES ###
+    # Translucency allows materials to simulate semi-transparent, refractive objects through which light can travel, like
+    # glass, liquids, plastic, wax, or skin.
+    # 
+    # Scattering and absorbing media is assumed to be uniformly distributed throughout a volume (homogeneous).
+    # 
+    # The interface between the surface and interior is unaffected by base color but is affected by the other surface
+    # properties. This is to allow the simulation of materials like skin with surface colorations that do not affect the interior
+    # transmission properties. See the skin section for more details.
+
+    float inputs:translucency = 0.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "translucency"
+        }
+        sdrMetadata = {
+            uint uiOrder = 19
+            token label = "Translucency"
+            token help = """Amount of refractive transmission through the surface. Translucency only affects dielectric surfaces—any amount of
+            metallicity present in a material will not be translucent. For non-refractive transmission, use opacity instead.
+            """
+            token page = "Interior Properties"
+            token usage = "translucency"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:IOR = 1.4 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "IOR"
+        }
+        sdrMetadata = {
+            uint uiOrder = 20
+            token label = "Specular Index of Refraction"
+            token help = """Dielectric index of refraction (IOR) for specular surface reflection and transmission. May be modified by specular
+            level. The effect of the IOR may be altered by the presence of a coat, which has its own index of refraction.
+
+            Note that when the IOR is 1 (that of a vacuum) here, the surface is non-reflective. If the atmospheric or surrounding
+            media is not considered to be a vacuum (or air, which has an IOR very close to 1), there may be surface effects as
+            determined by the ratio of the two media’s IORs.
+            """
+            token page = "Interior Properties"
+            token usage = "IOR"
+            float[] range = [ 1, inf ]
+            float[] soft_range = [ 1, 3 ]
+        }
+    )
+
+    float inputs:dispersion = 0.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "dispersion"
+        }
+        sdrMetadata = {
+            uint uiOrder = 21
+            token label = "Dispersion"
+            token help = """A reparameterization of the Abbe number, controlling the amount of chromatic dispersion in the volume. Realworld
+            materials fall between 0 and 1, but as that effect is rather subtle, the value may be increased past 1 up to 20.
+            """
+            token page = "Interior Properties"
+            token usage = "dispersion"
+            float[] range = [ 0, 20 ]
+        }
+    )
+
+    ### ABSORPTION ###
+    # As light travels through a media, a certain amount of light at specific wavelengths may be absorbed by the media.
+    # This will be perceived as a color shift, dependent on the distance the light travels through the media. This effect is
+    # also known as attenuation.
+    #
+    # It is often a challenge to translate the physical principles of light attenuation to art-directable parameters, but it is
+    # typically done in one of two ways:
+    #
+    #   1. Modulating the light that passes through the volume by a specific constant amount to approximate a color
+    #      of the media
+    #
+    #   2. Conversion of the desired attenuation characteristics into an absorption coefficient, which may then be
+    #      combined with scattering effects dependent on distance the light travels through the media.
+
+    # Our material model supports both of these methods.
+
+    color3f inputs:absorptionColor = (1.0, 1.0, 1.0) (
+        connectability = "full"
+        customData = {
+            string apiName = "absorptionColor"
+        }
+        sdrMetadata = {
+            uint uiOrder = 22
+            token label = "Absorption Color"
+            token help = """Color of attenuated white light in volume after it has reached the absorption distance.
+
+            Works best with values that are not partially saturated. Textured absorption may also result in artifacts if it varies
+            greatly over a smooth surface, as the interior of the volume is assumed to be homogenous. It is therefore
+            encouraged to only use textures when assigning color to discrete, closed subsections of geometry, or when setting
+            the absorption distance to 0 to treat the absorption as a modulative surface tint.
+
+            The default value of absorption color results in a clear volume with no absorption. Changing the luminosity of the
+            color has a similar effect to altering the absorption distance.
+            """
+            token page = "Interior Properties"
+            token usage = "absorptionColor"
+        }
+    )
+
+    float inputs:absorptionDistance = 0.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "absorptionDistance"
+        }
+        sdrMetadata = {
+            uint uiOrder = 23
+            token label = "Absorption Distance"
+            token help = """Depth in the volume at which the absorption color is matched, in scene units. Volumes with greater depth than the
+            distance will have more absorption and thus appear darker. Volumes with less depth than the distance will have less
+            absorption and thus appear lighter.
+
+            If the distance is 0, the absorption color is assumed to be modulative, and the resultant light attenuation will not
+            depend on the size of the volume. In the above example, the model is approximately 100 units wide, and as such
+            appears approximately the same color when the value is 0 and 100 (except near corners and thinner regions). When
+            the value is 0, the modulation is applied both at entrance and exit of the surface by square-rooting the color value of
+            the absorption color so that the attenuation will end up the same color.
+            """
+            token page = "Interior Properties"
+            token usage = "absorptionDistance"
+            float[] range = [ 0, inf ]
+        }
+    )
+
+    ### SUBSURFACE SCATTERING ###
+
+    bool inputs:scatter = false (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "scatter"
+        }
+        sdrMetadata = {
+            uint uiOrder = 24
+            token label = "Scatter"
+            token help = """The scatter property enables scattering for materials where translucency is greater than 0 or opacity is less than 1.
+
+            For basic scattering, we derive the single scattering albedo according to the model presented in [KullaConty17], but
+            extend the model with additional parameters that allow the scattering to have orthogonal control of several
+            different color-dependent scattering effects. The effects of these various parameters may be reduced (with
+            absorption) ultimately to a single pair of scattering and absorption coefficients for any point on the surface.
+
+            This behavior can be combined additively with the absorption properties to allow art-directable scattering with or
+            without additional absorption. Liquids, for example, often exhibit both simple absorption and scattering from
+            suspended particles—these sets of properties may be changed to balance the two effects.
+            """
+            token page = "Interior Properties"
+            token usage = "scatter"
+        }
+    )
+
+    color3f inputs:scatteringColor = (1.0, 1.0, 1.0) (
+        connectability = "full"
+        customData = {
+            string apiName = "scatteringColor"
+        }
+        sdrMetadata = {
+            uint uiOrder = 25
+            token label = "Scattering Color"
+            token help = """Overall color of scattering media in volume. The color is assumed to be the result of wavelength-dependent
+            absorption coefficients combined with uniform scattering coefficients.
+
+            Note that the scatter color is accumulated through a volume, and therefore there will be a shift in the “luminosity” of
+            the color based on the thickness of the volume. Different models of different sizes may, as a result, look quite
+            different with the same material.
+
+            In many cases where the surface of the object and the interior are a single homogenous material, the scattering
+            color may be set to the same value or texture as the base color. However, in some cases, it is advantageous to treat
+            the surface as a separate layer of the volume, in which case the scatter color may differ from the base color. For this
+            reason, the scatter color is not modulated by the base color—and the translucency property may be used to control
+            the blend between the two.
+            """
+            token page = "Interior Properties"
+            token usage = "scatteringColor"
+        }
+    )
+
+    float inputs:scatteringDistance = 1.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "scatteringDistance"
+        }
+        sdrMetadata = {
+            uint uiOrder = 26
+            token label = "Scattering Distance"
+            token help = """Average baseline depth of all scattering in the volume, in scene units. Specifically, it specifies the extinction mean
+            free path of the brightest color channel, and as such scales the effect of the other scattering properties.
+
+            Lower values will result in greater opacity of the material.
+            """
+            token page = "Interior Properties"
+            token usage = "scatteringDistance"
+            float[] range = [ 0, inf ]
+        }
+    )
+
+    float3 inputs:scatteringDistanceScale = (1.0, 1.0, 1.0) (
+        connectability = "full"
+        customData = {
+            string apiName = "scatteringDistanceScale"
+        }
+        sdrMetadata = {
+            uint uiOrder = 27
+            token label = "Scattering Distance Scale"
+            token help = """Scales the scattering distance by channel, with texture support.
+
+            Gray values operate as a simple density modifier on scatter distance, with lower values denoting more scattering or
+            subsurface opacity. In cases where a model has a grayscale “scattering” texture, it often may be applied to this
+            property for the desired effect.
+
+            When a color is used for this property, it allows certain colors to scatter more easily than others. This typically has
+            the effect of allowing a color shift by depth, but the results can sometimes be counterintuitive as the behavior is by
+            channel, thus causing a hue shift as well.
+            """
+            token page = "Interior Properties"
+            token usage = "scatteringDistanceScale"
+        }
+    )
+
+    float inputs:scatteringRedShift = 0.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "scatteringRedShift"
+        }
+        sdrMetadata = {
+            uint uiOrder = 28
+            token label = "Scattering Red Shift"
+            token help = """Allows red light to travel further in the volume, resulting in a reddish tint in thin backlit areas and shadowed areas.
+            Useful to simulate the diffusion of red light through skin caused by blood.
+
+            This property is comparable to setting a red color to scatter distance scale uniformly across the surface. The benefit
+            of the red shift property is that it is both independent of the scatter distance scale property (thus freeing that to be
+            used for other effects), and also that it scales the red channel beyond the scatter distance, allowing the shift to be
+            independently applied on top of all other scatter effects.
+            """
+            token page = "Interior Properties"
+            token usage = "scatteringRedShift"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:scatteringRayleigh = 0.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "scatteringRayleigh"
+        }
+        sdrMetadata = {
+            uint uiOrder = 29
+            token label = "Scattering Rayleigh"
+            token help = """In real-world materials, light often scatters differently according to its wavelength. One of the most recognizable
+            wavelength-dependent effects is Rayleigh scattering, where light at the blue end of the visible spectrum scatters
+            more than orange and red light on the other end. Besides being responsible for the color of the sky, it is also a
+            prominent factor in the color of milk, skin, marble, plastics, smoke, and many foods.
+
+            This property is a reduction of the Rayleigh effect into a simple uniform floating point value, where a higher value
+            translates to a stronger effect. It tends to add a blue tint to thinner and less-dense volumes, and will tint light passing
+            it orange or red. Note that the color effect can vary significantly by object thickness and how sharp edges are.
+            Please see the technical documentation for more information on the implementation.
+            """
+            token page = "Interior Properties"
+            token usage = "scatteringRayleigh"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    ### COAT ###
+    # A coat is a Fresnel-weighted dielectric surface on top of all other layers that scatters incoming light before reaching
+    # the underlying surface. Please see the technical documentation for more information on the implementation.
+
+    float inputs:coatOpacity = 0.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "coatOpacity"
+        }
+        sdrMetadata = {
+            uint uiOrder = 30
+            token label = "Coat Opacity"
+            token help = """Coat presence opacity. The above image shows a coat on top of a dielectric surface and a metallic surface.
+            Note that this also affects the strength of the tint effect of the coat.
+            """
+            token page = "Coat"
+            token usage = "coatOpacity"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    color3f inputs:coatColor = (1.0, 1.0, 1.0) (
+        connectability = "full"
+        customData = {
+            string apiName = "coatColor"
+        }
+        sdrMetadata = {
+            uint uiOrder = 31
+            token label = "Coat Color"
+            token help = "Color of all surface reflections beneath the coat. Note that it does not tint the reflections on the coat itself."
+            token page = "Coat"
+            token usage = "coatColor"
+        }
+    )
+
+    float inputs:coatRoughness = 0.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "coatRoughness"
+        }
+        sdrMetadata = {
+            uint uiOrder = 32
+            token label = "Coat Roughness"
+            token help = """Roughness of coat layer. The coat roughness does not affect the roughness of the surface beneath the coat—if that is
+            desired, the primary roughness can be set to the same or greater roughness as desired.
+            """
+            token page = "Coat"
+            token usage = "coatRoughness"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:coatIOR = 1.6 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "coatIOR"
+        }
+        sdrMetadata = {
+            uint uiOrder = 33
+            token label = "Coat Index of Refraction"
+            token help = """Index of refraction of the coat. In the case of dielectric surfaces, the coat IOR affects the incident IOR when calculating
+            the strength of specular reflection on the underlying surface.
+            """
+            token page = "Coat"
+            token usage = "coatIOR"
+            float[] range = [ 1, inf ]
+            float[] soft_range = [ 1, 3 ]
+        }
+    )
+
+    float inputs:coatSpecularLevel = 0.5 (
+        connectability = "full"
+        customData = {
+            string apiName = "coatSpecularLevel"
+        }
+        sdrMetadata = {
+            uint uiOrder = 34
+            token label = "Coat Specular Level"
+            token help = "Modifier of coat specularity, behaving in the same way as the underlying surface’s specular level and IOR."
+            token page = "Coat"
+            token usage = "coatSpecularLevel"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    normal3f inputs:coatNormal (
+        connectability = "full"
+        customData = {
+            string apiName = "coatNormal"
+        }
+        sdrMetadata = {
+            uint uiOrder = 35
+            token label = "Coat Normal"
+            token help = """Tangent-space normal map for the coat. Normal maps are assumed to be in the OpenGL format unless alternate
+            orientations are also supported.
+
+            The coat normal does not change the underlying surface normal. Please see the section on coat layering for more
+            detail.
+            """
+            token page = "Coat"
+            token usage = "coatNormal"
+        }
+    )
+
+    float inputs:coatNormalScale = 1.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "coatNormalScale"
+        }
+        sdrMetadata = {
+            uint uiOrder = 36
+            token label = "Coat Normal Scale"
+            token help = """Multiplier of the coat normal map effect. For scales above 1, the scale is applied by scaling the z axis and
+            renormalizing. For scales below 1, the scale is applied by proportionally reducing the angle between the normal vector
+            and the z axis, which results in a smoother transition of surface detail to 0.
+            """
+            token page = "Coat"
+            token usage = "coatNormalScale"
+            float[] range = [ 0, inf ]
+        }
+    )
+
+    ### AUXILIARY PROPERTIES ###
+    # The material model also has several properties commonly associated with raster rendering. These do not necessarily
+    # get used by all types of renderers but provide additional information about the object being rendered.
+
+    float inputs:ambientOcclusion = 1.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "ambientOcclusion"
+        }
+        sdrMetadata = {
+            uint uiOrder = 37
+            token label = "Ambient Occlusion"
+            token help = """Pre-computed ambient occlusion coefficient for the surface. This is primarily for rasterizers that do not support
+            global illumination, but the information can be useful in a ray tracing context.
+            """
+            token page = "Auxiliary Properties"
+            token usage = "ambientOcclusion"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:volumeThickness = 1.0 (
+        connectability = "full"
+        customData = {
+            string apiName = "volumeThickness"
+        }
+        sdrMetadata = {
+            uint uiOrder = 38
+            token label = "Volume Thickness"
+            token help = """Pre-computed measure of average thickness of the volume beneath the surface as a fraction of the bounding box
+            width. This can be used by rasterizers to emulate the behavior of material properties that would normally require ray
+            tracing through the volume, like scattering or absorption.
+            """
+            token page = "Auxiliary Properties"
+            token usage = "volumeThickness"
+            float[] range = [ 0, 1 ]
+        }
+    )
+
+    float inputs:volumeThicknessScale = 1.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "volumeThicknessScale"
+        }
+        sdrMetadata = {
+            uint uiOrder = 39
+            token label = "Volume Thickness Scale"
+            token help = "A multiplier of the volume thickness texture to modify its overall effect."
+            token page = "Auxiliary Properties"
+            token usage = "volumeThicknessScale"
+            float[] range = [ 0, inf ]
+        }
+    )
+}
+
+def Shader "AdobeShadowCatchingMaterial_1_0" (
+    sdrMetadata = {
+        token label = "Adobe Shadow Catching Material"
+        token help = """The Adobe shadow catching material is used to create holdouts: its response is invisible to the camera but it catches shadows."""
+    }
+)
+{
+    # We rely on `UsdShadeNodeDefAPI` API schema to specify this Shader Node Definition (aka Sdr Node)
+    uniform token info:id = "AdobeShadowCatchingMaterial_1_0"
+    uniform token info:implementationSource = "id"
+
+    token outputs:surface (
+        sdrMetadata = {
+            string renderType = "terminal surface"
+        }
+    )
+
+    float inputs:roughness = 0.2 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "roughness"
+        }
+        sdrMetadata = {
+            token label = "Roughness"
+        }
+    )
+
+    float inputs:shadowOpacity = 1.0 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "shadowOpacity"
+        }
+        sdrMetadata = {
+            token label = "Shadow Opacity"
+        }
+    )
+
+    float inputs:reflectionOpacity = 0.5 (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "reflectionOpacity"
+        }
+        sdrMetadata = {
+            token label = "Reflection Opacity"
+        }
+    )
+
+    bool inputs:localLightsEnabled = true (
+        connectability = "interfaceOnly"
+        customData = {
+            string apiName = "localLightsEnabled"
+        }
+        sdrMetadata = {
+            token label = "Local Lights Enabled"
+        }
+    )
+}

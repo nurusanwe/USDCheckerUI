@@ -64,8 +64,8 @@ def warm() -> None:
     for name in _SCHEMA_MODULES:
         importlib.import_module(f"pxr.{name}")
 
-    # User-configured Sdr plugin paths (Adobe ASM / hdEclair, Houdini
-    # Karma, custom studio shaders, ...). Each path is tried independently
+    # User-configured Sdr plugin paths (Houdini Karma, Renderman Pxr*,
+    # custom studio shaders, ...). Each path is tried independently
     # so one broken plugInfo does not block the others. Failures are
     # warned about but never fatal — the app still launches.
     import warnings as _warnings

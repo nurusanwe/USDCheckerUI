@@ -1,10 +1,10 @@
 """User-configured shader plugin paths.
 
 Registers additional plugin metadata into the pxr Plug registry so that
-`Sdr` discovery sees renderer-specific shader types (Adobe ASM via
-hdEclair, Houdini Karma, Renderman Pxr*, in-house studio shaders)
-instead of flagging them as "Shader identifier not found in Sdr
-registry".
+`Sdr` discovery sees renderer-specific shader types (Houdini Karma,
+Renderman Pxr*, in-house studio shaders, and any shader library that
+ships its own Sdr plugin) instead of flagging them as "Shader
+identifier not found in Sdr registry".
 
 Qt-free by design: this module only touches pxr.Plug and a YAML config
 on disk. The UI layer imports it to read/write the path list and to

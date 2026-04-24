@@ -31,6 +31,9 @@ a = Analysis(  # noqa: F821
     datas=[
         (str(ROOT / "src" / "usdchecker_ui" / "core" / "patterns.yaml"),
          "usdchecker_ui/core"),
+        (str(ROOT / "src" / "usdchecker_ui" / "core" / "bundled_shaders"
+             / "shader_definitions.usda"),
+         "usdchecker_ui/core/bundled_shaders"),
         *pxr_datas,
     ],
     hiddenimports=pxr_hiddenimports,

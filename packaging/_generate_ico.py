@@ -67,7 +67,7 @@ import struct
 from pathlib import Path
 
 SIZE = 48
-BGRA = (180, 100, 30, 255)  # Eclair-ish blue; stored BGRA because BMP is BGRA.
+BGRA = (180, 100, 30, 255)  # Brand-ish blue; stored BGRA because BMP is BGRA.
 
 
 def _build_ico_bytes() -> bytes:

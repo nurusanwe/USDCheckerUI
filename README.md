@@ -269,12 +269,42 @@ file automatically — the Sdr card should flip from "unknown" to a
 clean diagnostic (or disappear entirely if the shader was the only
 issue).
 
-### Adobe Eclair (ASM_*)
+---
 
-Point **Add directory…** at the plugin directory that ships
-`shader_definitions.usda`. The exact location depends on how you
-installed the `hdEclair` plugin on your machine; ask the Eclair team
-if you are not sure.
+## Built-in shader identifiers (zero-config)
+
+USDChecker UI ships with a bundled `shader_definitions.usda` that
+covers Adobe Standard Material out of the box. The file is parsed at
+launch and the `info:id` values it declares
+(`AdobeStandardMaterial_4_0`, `AdobeShadowCatchingMaterial_1_0`, …)
+are treated as known. When the USD validator would otherwise emit
+`Shader <…> has invalid shader node.` for a prim whose `info:id`
+matches one of these identifiers, the diagnostic is silently
+suppressed and a count is added to the status bar line so you can
+see that something actually happened (e.g. "12 diagnostic(s) in
+0.35s. — 3 known-shader warning(s) suppressed").
+
+Why this is not done through pxr's Sdr plugin system
+: the bundled shaders declare `info:implementationSource = "id"`
+without any source asset / source code attached, which is the point
+of that shader model. pxr's bundled Sdr parsers (glslfx, USD)
+require a source they can parse to build an `SdrShaderNode`, so
+they emit zero discovery results for these prims. On top of that,
+pxr's Sdr plugin API is not usable from Python (`Sdr.DiscoveryPlugin`
+cannot be subclassed from Python, `SetExtraDiscoveryPlugins` /
+`SetExtraParserPlugins` only accept TfType references to C++
+classes, and `AddDiscoveryResult` silently drops entries whose
+`sourceType` no parser consumes). Suppressing the diagnostic in
+the runner is therefore the only Python-only path that achieves a
+zero-config experience; other renderer-specific shader types
+(Houdini Karma, Renderman `Pxr*`, in-house studio shaders) remain
+opt-in via Settings → Shader plugin paths…
+
+The bundled `shader_definitions.usda` is a snapshot; it is not
+fetched live. Refresh path: replace
+`src/usdchecker_ui/core/bundled_shaders/shader_definitions.usda`
+with an updated copy, commit, rebuild. Existing tests will tell
+you if the set of declared identifiers changed.
 
 ---
 

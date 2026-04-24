@@ -80,7 +80,7 @@ class ShaderPluginsDialog(QDialog):
         layout.addWidget(QLabel(
             "Additional plugInfo.json paths loaded into the Sdr registry "
             "so renderer-specific shader types are recognised during "
-            "validation (e.g. Adobe ASM via hdEclair, Houdini Karma).",
+            "validation (e.g. renderer-specific or studio-specific shaders).",
             self,
         ))
         layout.itemAt(0).widget().setWordWrap(True)

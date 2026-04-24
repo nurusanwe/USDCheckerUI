@@ -213,7 +213,7 @@ def test_shader_invalid_node_acknowledges_plugin_false_positive() -> None:
 
     # At least one concrete renderer-specific culprit is named, so the
     # reader can self-identify their situation.
-    assert any(name in body for name in ("ASM", "hdEclair", "Karma", "Renderman")), body
+    assert any(name in body for name in ("Adobe", "ASM", "Karma", "Renderman")), body
 
     # And the "really-wrong" branch is still there — we did not drop the
     # guidance for the case where info:id is a genuine typo.

@@ -426,18 +426,20 @@
        renderer-specific or studio-specific shader types surface
        as "unknown". Common culprits:
 
-         - `ASM_*` / Adobe Standard Material — needs the
-           `hdEclair` plugin (Adobe Eclair Studio) whose
-           shader_definitions.usda registers the ASM_* family.
+         - `AdobeStandardMaterial_*` and `AdobeShadowCatchingMaterial_*` —
+           these are declared by the bundled `shader_definitions.usda`
+           that ships with USDChecker UI; diagnostics for these
+           identifiers are suppressed automatically.
          - Houdini Karma, Renderman `Pxr*`, in-house studio
            shaders — need their respective Sdr plugin to be
-           registered before the stage is composed.
+           registered via Settings → Shader plugin paths…
   suggestion: |
     If the identifier is correct AND the matching Sdr plugin would
     be present in the runtime/render environment where the USD is
     actually consumed, this diagnostic is a false positive for this
-    validation pass — safe to ignore until USDChecker UI is able to
-    load external shader_definitions.usda files (planned).
+    validation pass — safe to ignore. For shader families that you
+    hit repeatedly, point USDChecker UI at the plugin that defines
+    them via Settings → Shader plugin paths…
 
     If the identifier is genuinely wrong:
       - Check the spelling of `info:id` against the shader's

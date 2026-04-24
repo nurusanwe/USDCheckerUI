@@ -33,6 +33,9 @@ a = Analysis(  # noqa: F821
     datas=[
         (str(ROOT / "src" / "usdchecker_ui" / "core" / "patterns.yaml"),
          "usdchecker_ui/core"),
+        (str(ROOT / "src" / "usdchecker_ui" / "core" / "bundled_shaders"
+             / "shader_definitions.usda"),
+         "usdchecker_ui/core/bundled_shaders"),
         *pxr_datas,
     ],
     hiddenimports=pxr_hiddenimports,
@@ -76,11 +79,11 @@ app = BUNDLE(  # noqa: F821
     coll,
     name="USDCheckerUI.app",
     icon=None,
-    bundle_identifier="com.adobe.eclair.usdchecker-ui",
+    bundle_identifier="com.adobe.usdchecker-ui",
     info_plist={
         "CFBundleDisplayName": "USDChecker UI",
         "CFBundleName": "USDCheckerUI",
-        "CFBundleIdentifier": "com.adobe.eclair.usdchecker-ui",
+        "CFBundleIdentifier": "com.adobe.usdchecker-ui",
         "CFBundleShortVersionString": "0.1.0",
         "CFBundleVersion": "0.1.0",
         "NSHighResolutionCapable": True,
